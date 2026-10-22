@@ -1,0 +1,87 @@
+#include <WiFi.h>
+#include <DHT.h>
+#include "AdafruitIO_WiFi.h"
+
+// ------------------------------------------------------------------
+// 1. CONFIGURACIÓN DE CREDENCIALES
+// ------------------------------------------------------------------
+#define WIFI_SSID       ""
+#define WIFI_PASS       ""
+
+#define IO_USERNAME     ""
+#define IO_KEY          ""
+
+// ------------------------------------------------------------------
+// 2. CONFIGURACIÓN DE PINES Y SENSOR (DHT11)
+// ------------------------------------------------------------------
+#define DHTPIN 33         // Cambiado al pin D33 físico de tu ESP32
+#define DHTTYPE DHT11     
+
+DHT dht(DHTPIN, DHTTYPE);
+
+// ------------------------------------------------------------------
+// 3. OBJETOS DE CONEXIÓN A ADAFRUIT IO
+// ------------------------------------------------------------------
+AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
+
+AdafruitIO_Feed *feedTemperatura = io.feed("temperatura");
+AdafruitIO_Feed *feedHumedad = io.feed("humedad");
+
+// ------------------------------------------------------------------
+// 4. SETUP (INICIALIZACIÓN)
+// ------------------------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+  while(!Serial);
+
+  Serial.println("Iniciando laboratorio ESP32 + DHT11...");
+
+  dht.begin();
+
+  Serial.print("Conectando a Wi-Fi y Adafruit IO");
+  io.connect();
+
+  // Esperar hasta que se establezca la conexión completa
+  while(io.status() < AIO_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+
+  Serial.println();
+  Serial.println("¡Conectado exitosamente!");
+  Serial.println(io.statusText());
+}
+
+// ------------------------------------------------------------------
+// 5. LOOP (CICLO PRINCIPAL)
+// ------------------------------------------------------------------
+void loop() {
+  // Leer los valores del sensor
+  float humedad = dht.readHumidity();
+  float temperatura = dht.readTemperature();
+
+  // Validar si la lectura fue exitosa
+  if (isnan(humedad) || isnan(temperatura)) {
+    Serial.println("Error: No se pudo leer el sensor DHT11. Revisa las conexiones.");
+    delay(2000);
+    return;
+  }
+
+  // Imprimir valores en el Monitor Serie
+  Serial.print("Temperatura: ");
+  Serial.print(temperatura);
+  Serial.print(" °C | Humedad: ");
+  Serial.print(humedad);
+  Serial.println(" %");
+
+  // Enviar los datos a los Feeds correspondientes en Adafruit IO
+  feedTemperatura->save(temperatura);
+  feedHumedad->save(humedad);
+
+  // io.run() procesa los paquetes de datos y mantiene vivo el ping con el servidor
+  io.run();
+
+  // Adafruit IO (cuenta gratuita) permite subir datos máximo cada 2 segundos. 
+  // 10 segundos es un intervalo seguro y excelente para telemetría.
+  delay(10000); 
+}
