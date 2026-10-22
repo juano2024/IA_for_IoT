@@ -1,0 +1,49 @@
+# Servidor IA for IoT
+#
+# Uso:
+#   docker compose up -d --build     # levantar el servidor
+#   docker compose logs -f api       # ver los logs
+#   docker compose down              # detener
+#
+# En la maquina virtual de Vagrant este compose se ejecuta DENTRO de la VM
+# Ubuntu; el contenedor publica el 8080 de la VM y Vagrant lo reenvia al 8080
+# del host. En Docker directo el 8080 del host apunta al contenedor.
+#
+# Las variables TEMP_*, HUM_* y DEVICE_API_KEY se pueden definir en .env.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ia-for-iot:latest
+    container_name: ia_for_iot_api
+    restart: unless-stopped
+    ports:
+      # host:contenedor. La API queda siempre en http://localhost:8080,
+      # tanto con Docker directo como con la VM de Vagrant.
+      - "8080:8000"
+    environment:
+      # Las rutas son fijas del contenedor; no las sobreescribas desde .env.
+      DATABASE_URL: "sqlite:////app/data/ia_for_iot.db"
+      CSV_PATH: "/app/data/lecturas.csv"
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8000"
+      # Ajustables desde .env (con estos valores por defecto).
+      TEMP_MIN: "${TEMP_MIN:-18}"
+      TEMP_MAX: "${TEMP_MAX:-22}"
+      HUM_MIN: "${HUM_MIN:-40}"
+      HUM_MAX: "${HUM_MAX:-60}"
+      DEVICE_API_KEY: "${DEVICE_API_KEY:-}"
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

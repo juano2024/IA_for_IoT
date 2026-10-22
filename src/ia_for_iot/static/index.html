@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IA for IoT - Monitoreo de confort termico y respiratorio</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #273449;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --ok: #22c55e;
+    --alert: #ef4444;
+    --accent: #38bdf8;
+    --border: #334155;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  h1 { font-size: 1.45rem; margin: 0 0 4px; }
+  h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+  header { display: flex; justify-content: space-between; align-items: flex-start;
+           flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .sub { color: var(--muted); font-size: .85rem; }
+  .pill { padding: 6px 14px; border-radius: 999px; font-size: .8rem; font-weight: 600;
+          border: 1px solid var(--border); }
+  .pill.ok { color: var(--ok); border-color: var(--ok); background: rgba(34,197,94,.12); }
+  .pill.alert { color: var(--alert); border-color: var(--alert); background: rgba(239,68,68,.12); }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+          margin-bottom: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+          padding: 16px; }
+  .card .label { color: var(--muted); font-size: .75rem; text-transform: uppercase;
+                 letter-spacing: .04em; }
+  .card .value { font-size: 1.7rem; font-weight: 700; margin-top: 6px; }
+  .card .value small { font-size: .9rem; font-weight: 400; color: var(--muted); }
+  .ok-text { color: var(--ok); }
+  .alert-text { color: var(--alert); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+           padding: 18px; margin-bottom: 16px; }
+  .chart-wrap { position: relative; height: 340px; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; }
+  td.estado-ok { color: var(--ok); font-weight: 600; }
+  td.estado-alerta { color: var(--alert); font-weight: 600; }
+  .scroll { max-height: 330px; overflow-y: auto; }
+  footer { color: var(--muted); font-size: .78rem; margin-top: 8px; }
+  code { background: var(--panel-2); padding: 2px 6px; border-radius: 5px; font-size: .85em; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>IA for IoT &middot; Monitoreo de confort termico y respiratorio</h1>
+    <p class="sub">Cuarto de bebe &middot; rango objetivo 18&ndash;22 &deg;C y 40&ndash;60 % HR
+       &middot; ESP32 + DHT11</p>
+  </div>
+  <div>
+    <span class="pill" id="estado">conectando&hellip;</span>
+  </div>
+</header>
+
+<div class="grid">
+  <div class="card">
+    <div class="label">Temperatura</div>
+    <div class="value" id="kpi-temp">&mdash;<small> &deg;C</small></div>
+  </div>
+  <div class="card">
+    <div class="label">Humedad relativa</div>
+    <div class="value" id="kpi-hum">&mdash;<small> %</small></div>
+  </div>
+  <div class="card">
+    <div class="label">Estado del ambiente</div>
+    <div class="value" id="kpi-estado">&mdash;</div>
+  </div>
+  <div class="card">
+    <div class="label">Lecturas registradas</div>
+    <div class="value" id="kpi-total">&mdash;</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Serie temporal</h2>
+  <div class="chart-wrap"><canvas id="grafico"></canvas></div>
+</div>
+
+<div class="panel">
+  <h2>Ultimas lecturas</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Fecha y hora (UTC)</th><th>Dispositivo</th><th>Temperatura</th>
+            <th>Humedad</th><th>Estado</th><th>Motivo</th></tr>
+      </thead>
+      <tbody id="tabla">
+        <tr><td colspan="6">Cargando datos&hellip;</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<footer>
+  API interactiva: <a href="/docs">/docs</a> &middot;
+  <a href="/api/health">/api/health</a> &middot;
+  <a href="/api/lecturas">/api/lecturas</a> &middot;
+  <a href="/api/estadisticas">/api/estadisticas</a> &middot;
+  <a href="/api/lecturas.csv">/api/lecturas.csv</a>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var grafico = null;
+
+  function formatoHora(iso) {
+    var d = new Date(iso);
+    return d.toLocaleString("es", { hour12: false });
+  }
+
+  // Plugin que dibuja la banda de confort segura sobre el area del grafico.
+  var bandaConfort = {
+    id: "bandaConfort",
+    beforeDatasetsDraw: function (chart, args, opts) {
+      var escala = opts && opts.escala;
+      if (!escala) { return; }
+      var area = chart.chartArea;
+      var ctx = chart.ctx;
+      var y1 = escala.getPixelForValue(opts.max);
+      var y2 = escala.getPixelForValue(opts.min);
+      ctx.save();
+      ctx.fillStyle = "rgba(34, 197, 94, 0.10)";
+      ctx.fillRect(area.left, Math.min(y1, y2), area.right - area.left, Math.abs(y2 - y1));
+      ctx.restore();
+    }
+  };
+
+  function crearGrafico(lecturas, umbrales) {
+    var etiquetas = lecturas.map(function (l) { return formatoHora(l.timestamp); });
+    var temperaturas = lecturas.map(function (l) { return l.temperatura_c; });
+    var humedades = lecturas.map(function (l) { return l.humedad_pct; });
+
+    var datos = {
+      labels: etiquetas,
+      datasets: [
+        {
+          label: "Temperatura (C)",
+          data: temperaturas,
+          yAxisID: "yTemp",
+          borderColor: "#f97316",
+          backgroundColor: "rgba(249, 115, 22, 0.12)",
+          tension: 0.35,
+          fill: false,
+          pointRadius: 2,
+          borderWidth: 2
+        },
+        {
+          label: "Humedad (%)",
+          data: humedades,
+          yAxisID: "yHum",
+          borderColor: "#38bdf8",
+          backgroundColor: "rgba(56, 189, 248, 0.12)",
+          tension: 0.35,
+          fill: false,
+          pointRadius: 2,
+          borderWidth: 2
+        }
+      ]
+    };
+
+    var opciones = {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0" } },
+        tooltip: { callbacks: { title: function (items) { return items[0].label; } } }
+      },
+      scales: {
+        x: { ticks: { color: "#94a3b8", maxTicksLimit: 8 }, grid: { color: "rgba(148,163,184,.12)" } },
+        yTemp: {
+          position: "left",
+          title: { display: true, text: "Temperatura (C)", color: "#f97316" },
+          ticks: { color: "#f97316" },
+          grid: { color: "rgba(148,163,184,.12)" }
+        },
+        yHum: {
+          position: "right",
+          title: { display: true, text: "Humedad (%)", color: "#38bdf8" },
+          ticks: { color: "#38bdf8" },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    };
+
+    if (grafico) { grafico.destroy(); }
+    grafico = new Chart(document.getElementById("grafico"), {
+      type: "line",
+      data: datos,
+      options: opciones,
+      plugins: [bandaConfort]
+    });
+
+    // Banda segura de temperatura (18-22 C) sobre el eje izquierdo.
+    grafico.options.plugins.bandaConfort = {
+      escala: grafico.scales.yTemp,
+      min: umbrales.temperatura_c.min,
+      max: umbrales.temperatura_c.max
+    };
+    grafico.update();
+  }
+
+  function pintarKpis(lecturas, stats) {
+    var pill = document.getElementById("estado");
+    if (!lecturas.length) {
+      document.getElementById("kpi-temp").innerHTML = "&mdash;<small> &deg;C</small>";
+      document.getElementById("kpi-hum").innerHTML = "&mdash;<small> %</small>";
+      document.getElementById("kpi-estado").textContent = "sin datos";
+      document.getElementById("kpi-total").textContent = "0";
+      pill.textContent = "sin lecturas";
+      pill.className = "pill";
+      return;
+    }
+    var ultima = lecturas[0];
+    var ok = !ultima.alerta;
+    pill.textContent = ok ? "Ambiente en rango" : "Alerta de confort";
+    pill.className = "pill " + (ok ? "ok" : "alert");
+
+    document.getElementById("kpi-temp").innerHTML =
+      ultima.temperatura_c.toFixed(1) + "<small> &deg;C</small>";
+    document.getElementById("kpi-hum").innerHTML =
+      ultima.humedad_pct.toFixed(1) + "<small> %</small>";
+
+    var estado = document.getElementById("kpi-estado");
+    estado.textContent = ok ? "Confortable" : "Fuera de rango";
+    estado.className = "value " + (ok ? "ok-text" : "alert-text");
+
+    document.getElementById("kpi-total").textContent =
+      (stats && stats.total !== undefined) ? stats.total : lecturas.length;
+  }
+
+  function pintarTabla(lecturas) {
+    var cuerpo = document.getElementById("tabla");
+    if (!lecturas.length) {
+      cuerpo.innerHTML = '<tr><td colspan="6">Sin lecturas registradas</td></tr>';
+      return;
+    }
+    var html = "";
+    lecturas.forEach(function (l) {
+      var clase = l.alerta ? "estado-alerta" : "estado-ok";
+      html += "<tr><td>" + formatoHora(l.timestamp) + "</td><td>" + l.dispositivo +
+              "</td><td>" + l.temperatura_c.toFixed(1) + " &deg;C</td><td>" +
+              l.humedad_pct.toFixed(1) + " %</td><td class=\"" + clase + "\">" +
+              l.estado + "</td><td>" + (l.motivo || "&mdash;") + "</td></tr>";
+    });
+    cuerpo.innerHTML = html;
+  }
+
+  function actualizar() {
+    Promise.all([
+      fetch("/api/lecturas/recientes?limite=60").then(function (r) { return r.json(); }),
+      fetch("/api/estadisticas?ventana=100").then(function (r) { return r.json(); }),
+      fetch("/api/umbrales").then(function (r) { return r.json(); })
+    ]).then(function (res) {
+      var lecturas = res[0].slice().reverse();
+      pintarKpis(lecturas, res[1]);
+      pintarTabla(lecturas);
+      if (typeof Chart !== "undefined") {
+        crearGrafico(lecturas, res[2]);
+      } else {
+        document.getElementById("grafico").style.display = "none";
+      }
+    }).catch(function (err) {
+      var pill = document.getElementById("estado");
+      pill.textContent = "sin conexion con la API";
+      pill.className = "pill alert";
+      console.error(err);
+    });
+  }
+
+  actualizar();
+  setInterval(actualizar, 5000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+[project]
+name = "ia-for-iot"
+version = "0.1.0"
+description = "Servidor web IoT que recibe, procesa y almacena lecturas de temperatura y humedad de un ESP32 con sensor DHT11"
+readme = "README.md"
+authors = [
+    { name = "JulioCRP", email = "JulioCRP@users.noreply.github.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.159.1",
+    "uvicorn[standard]>=0.54.0",
+    "sqlalchemy>=2.1.6",
+    "pydantic-settings>=2.16.1",
+]
+
+[project.scripts]
+ia-for-iot = "ia_for_iot:main"
+simular-esp32 = "ia_for_iot.simulador:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.28",
+    "ruff>=0.14",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.2,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]

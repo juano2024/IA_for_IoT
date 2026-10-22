@@ -1,0 +1,27 @@
+# Normaliza los finales de linea para que el proyecto funcione igual en
+# Windows, macOS y Linux.
+
+* text=auto
+
+# Scripts de shell: SIEMPRE LF. Si llegan con CRLF a Linux, fallan con
+# "/usr/bin/env bash^M: bad interpreter".
+*.sh        text eol=lf
+*.bash      text eol=lf
+
+# Configuracion de contenedores, VM y Python
+Dockerfile  text eol=lf
+Vagrantfile text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.toml      text eol=lf
+*.lock      text eol=lf
+.python-version text eol=lf
+
+# Firmware y documentacion
+*.ino       text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.csv       text eol=lf
+
+# Scripts de PowerShell (se ejecutan en Windows)
+*.ps1       text eol=crlf
