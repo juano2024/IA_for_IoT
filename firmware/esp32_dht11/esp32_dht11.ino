@@ -33,10 +33,8 @@
 #define WIFI_SSID       "TU_NOMBRE_WIFI"
 #define WIFI_PASS       "TU_CLAVE_WIFI"
 
-// Direccion del servidor donde corre la API.
-// En la maquina virtual de Vagrant el puerto del host (8080) reenvia al contenedor.
-// Desde otro dispositivo de la red usa la IP LAN del PC que corre la VM.
-#define SERVER_URL     "http://192.168.1.100:8080"
+// Direccion del servidor en Google Cloud Platform (Compute Engine)
+#define SERVER_URL     "http://34.136.139.59:8080"
 #define API_PATH       "/api/lecturas"
 
 // Dejar vacio si el servidor no exige clave (DEVICE_API_KEY no esta definido).
