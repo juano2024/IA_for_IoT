@@ -1,0 +1,15 @@
+# Actualizacion de la VM y paridad CSV / InfluxDB - 2026-10-31T12:53:31Z
+
+Se volvio a ejecutar el startup script (commit ed98ccc). Datos antes de publicar:
+CSV: 8 filas
+InfluxDB: (no se extrajo el conteo en esta lectura)
+
+Se publican 5 lecturas desde Internet:
+Simulador finalizado: 5 lecturas publicadas.
+
+Datos despues:
+CSV: 13 filas
+InfluxDB: 14 puntos
+
+InfluxDB tiene un punto mas que el CSV: es la lectura de la primera escritura
+que supero el tiempo de espera antes de la correccion (ver ENTREGA, seccion 11).

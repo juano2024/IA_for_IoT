@@ -493,6 +493,8 @@ VM `iot-p2-vm` (`e2-micro`, `us-central1-a`), IP `136.113.16.29`, rama
 | Alertas con 33 °C / 50 % | «Temperatura alta» y «Humedad baja» en `firing` | ambos |
 | Alertas al normalizar | Las cuatro reglas en `inactive`; el notificador registra `[RESOLVED]` en 1 min | ambos |
 | Grafana sin credenciales | `HTTP 401` | `01_pruebas_desde_internet.txt` |
+| Actualizar la VM sin perder datos | Al volver a ejecutar el startup script (commit `ed98ccc`), el CSV conservó sus 8 filas | `03_actualizacion_y_paridad.txt` |
+| Doble persistencia tras la corrección | 5 lecturas más: el CSV pasó de 8 a 13 y InfluxDB de 9 a 14 | `03_actualizacion_y_paridad.txt` |
 
 \* En la `e2-micro`, la primera escritura en InfluxDB tardó más que el tiempo
 de espera del cliente (10 s). InfluxDB guardó el punto, pero el puente lo dio
