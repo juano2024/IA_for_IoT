@@ -961,9 +961,8 @@ broker MQTT, un puente guarda cada lectura en InfluxDB y en el CSV, y Grafana
 visualiza y alerta. Todo se levanta con Docker Compose dentro de la misma VM
 de la Práctica 1 y se despliega en Google Cloud (sección 14.8).
 
-Caso de uso: **condiciones del cultivo de tomate en invernadero**. Rangos
-óptimos: 15–30 °C y 60–80 % de humedad relativa (fuente: Infoagro,
-[*El cultivo del tomate*](https://www.infoagro.com/documentos/el_cultivo_del_tomate__parte_i_.asp)).
+Caso de uso: **condiciones de confort en un invernadero**. Rangos
+óptimos: 15–30 °C y 60–80 % de humedad relativa (fuente: guías de cultivo).
 
 ### 14.1 Arquitectura
 
@@ -1051,7 +1050,7 @@ El provisioning automático crea:
 - Datasource **InfluxDB IoT** (Flux, uid `influxdb-iot`).
 - Dashboard **IA for IoT - Confort del invernadero** (uid `ia-iot-confort`):
   temperatura actual, humedad actual, estado de confort y dos series temporales
-  con las bandas óptimas del tomate, 15–30 °C y 60–80 %.
+  con las bandas de confort, 15–30 °C y 60–80 %.
 - Cuatro reglas de alerta (carpeta `IA for IoT`, evaluación cada 10 s):
 
 | Alerta | Condición | Severidad |
