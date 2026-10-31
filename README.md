@@ -959,7 +959,11 @@ Cobertura funcional de las pruebas:
 Esta práctica añade la ruta de telemetría industrial: el ESP32 publica en un
 broker MQTT, un puente guarda cada lectura en InfluxDB y en el CSV, y Grafana
 visualiza y alerta. Todo se levanta con Docker Compose dentro de la misma VM
-de la Práctica 1.
+de la Práctica 1 y se despliega en Google Cloud (sección 14.8).
+
+Caso de uso: **condiciones del cultivo de tomate en invernadero**. Rangos
+óptimos: 15–30 °C y 60–80 % de humedad relativa (fuente: Infoagro,
+[*El cultivo del tomate*](https://www.infoagro.com/documentos/el_cultivo_del_tomate__parte_i_.asp)).
 
 ### 14.1 Arquitectura
 
@@ -977,7 +981,7 @@ flowchart LR
 | Componente | Imagen | Puerto host | Función |
 |---|---|---|---|
 | `mosquitto` | `eclipse-mosquitto:2` | 1883 | Broker MQTT con usuario y contraseña |
-| `influxdb` | `influxdb:2.7` | 8086 | Base de datos de series de tiempo (bucket `iot`) |
+| `influxdb` | `influxdb:2.7` | 8086 (en GCP no se publica) | Base de datos de series de tiempo (bucket `iot`) |
 | `grafana` | `grafana/grafana-oss:11.6.0` | 3000 | Dashboards y alertas |
 | `bridge` | `ia-for-iot:latest` | — | Suscribe `invernadero1/#` y escribe InfluxDB + CSV |
 | `notifier` | `python:3.14-slim` | — | Recibe los webhooks de alerta y los registra |
@@ -1047,29 +1051,36 @@ El provisioning automático crea:
 - Datasource **InfluxDB IoT** (Flux, uid `influxdb-iot`).
 - Dashboard **IA for IoT - Confort del invernadero** (uid `ia-iot-confort`):
   temperatura actual, humedad actual, estado de confort y dos series temporales
-  con bandas de confort 18–22 °C y 40–60 %.
+  con las bandas óptimas del tomate, 15–30 °C y 60–80 %.
 - Cuatro reglas de alerta (carpeta `IA for IoT`, evaluación cada 10 s):
 
 | Alerta | Condición | Severidad |
 |---|---|---|
-| Temperatura alta | último valor > 22 °C | critical |
-| Temperatura baja | último valor < 18 °C | critical |
-| Humedad alta | último valor > 60 % | warning |
-| Humedad baja | último valor < 40 % | warning |
+| Temperatura alta | último valor > 30 °C | critical |
+| Temperatura baja | último valor < 15 °C | critical |
+| Humedad alta | último valor > 80 % | warning |
+| Humedad baja | último valor < 60 % | warning |
+
+Las consultas de las alertas y de los paneles agrupan por `dispositivo`
+antes de tomar el último valor. Sin ese paso, la etiqueta `estado` separaba
+los datos en una serie OK y otra ALERTA, y una alerta seguía disparada hasta
+5 minutos después de normalizarse la lectura.
 
 - Punto de contacto **Webhook notificador** → `http://notifier:8080/alert`.
   El notificador escribe cada aviso en `mqtt/notifier/data/notificaciones.log`
   y en la salida estándar del contenedor.
 
-Prueba rápida de una alerta (fuerza 30,5 °C y 80 %):
+Prueba rápida de una alerta (fuerza 12 °C y 85 %):
 
 ```powershell
 uv run simular-esp32-mqtt --host 127.0.0.1 --user iot --password iot2026 `
-  --count 2 --interval 2 --temperatura 30.5 --humedad 80
+  --count 2 --interval 2 --temperatura 12 --humedad 85
 ```
 
-En 10–20 s la alerta pasa a `firing` en
+En 10–30 s «Temperatura baja» y «Humedad alta» pasan a `firing` en
 <http://127.0.0.1:3000/alerting/list> y el notificador registra `[FIRING:1]`.
+Al enviar valores normales (`--temperatura 24 --humedad 70`) quedan en
+`[RESOLVED]` en unos 30 s.
 
 Notificaciones por correo (opcional): define `GRAFANA_SMTP_*` en `.env` y
 añade un contact point de tipo email en Grafana.
@@ -1088,8 +1099,9 @@ Opciones: `--temperatura` y `--humedad` fijan valores para probar alertas;
 
 `firmware/esp32_dht11_mqtt/esp32_dht11_mqtt.ino` publica cada 10 s en
 `invernadero1/temperatura` y `invernadero1/humedad`. Ajusta `WIFI_SSID`,
-`WIFI_PASS`, `MQTT_HOST` (IP LAN del PC con Vagrant o IP pública de la EC2) y
-las credenciales `MQTT_USER`/`MQTT_PASS`.
+`WIFI_PASS`, `MQTT_HOST` (IP LAN del PC con Vagrant o IP externa de la VM en
+Google Cloud) y las credenciales `MQTT_USER`/`MQTT_PASS`. Esos valores se
+comparten por un canal privado; no se suben al repositorio.
 
 ```bash
 arduino-cli lib install PubSubClient
@@ -1097,25 +1109,35 @@ arduino-cli compile --fqbn esp32:esp32:esp32 firmware/esp32_dht11_mqtt
 arduino-cli upload -p COM3 --fqbn esp32:esp32:esp32 firmware/esp32_dht11_mqtt
 ```
 
-### 14.8 Despliegue en AWS (documentado)
+### 14.8 Despliegue en Google Cloud
 
-Los pasos completos están en [`ENTREGA_PRACTICA_2.md`](ENTREGA_PRACTICA_2.md).
-Resumen:
+Los pasos completos están en [`ENTREGA_PRACTICA_2.md`](ENTREGA_PRACTICA_2.md),
+sección 8. Un solo script crea todo:
 
-1. **VPC** `10.0.0.0/16` con subred pública `10.0.1.0/24` en una AZ.
-2. **Internet Gateway** + tabla de rutas `0.0.0.0/0 → igw`.
-3. **Security Group**: 22 (tu IP), 1883, 3000 y 8086 (idealmente solo tu IP),
-   y 8080 para la API de la Práctica 1.
-4. **EC2** Ubuntu 22.04, `t3.small` (2 vCPU, 2 GB), disco 20 GB.
-5. Instalar Docker + Compose, clonar el repositorio y ejecutar
-   `docker compose -f mqtt/docker-compose.yml up -d --build`.
-6. Asociar una **Elastic IP** y actualizar `MQTT_HOST` en el firmware.
-7. Configurar el **Security Group** (el control real: `ufw` no filtra los
-   puertos publicados por Docker) y limitar el origen a tu IP.
+```powershell
+# Crear proyecto, IP estática, firewall y VM (claves nuevas en .env.gcp)
+.\scripts\gcp_practica2.ps1 -Up -ProjectId ia-iot-p2-2026 -BillingAccount <ID>
 
-> En producción no expongas InfluxDB ni MQTT sin TLS: usa un proxy inverso
-> (Caddy/Nginx), `mosquitto` con TLS y un token de InfluxDB de solo lectura
-> para Grafana.
+# Ver el arranque y los contenedores (SSH por IAP)
+.\scripts\gcp_practica2.ps1 -Status -ProjectId ia-iot-p2-2026
+
+# Borrar el proyecto completo al terminar
+.\scripts\gcp_practica2.ps1 -Down -ProjectId ia-iot-p2-2026
+```
+
+| Recurso | Configuración |
+|---|---|
+| VM | `e2-micro` (capa gratuita), Ubuntu 22.04, disco estándar de 20 GB, 2 GB de intercambio |
+| IP | Externa estática; es la que va en `MQTT_HOST` del firmware |
+| Firewall | 1883 y 3000 abiertos; SSH solo por IAP; **8086 cerrado** |
+| Arranque | [`deploy/gcp_mqtt_startup.sh`](deploy/gcp_mqtt_startup.sh): instala Docker, clona la rama, escribe `mqtt/.env` desde los metadatos y levanta el stack |
+| Override | [`mqtt/docker-compose.gcp.yml`](mqtt/docker-compose.gcp.yml): InfluxDB solo en la red interna de Docker y contraseñas obligatorias |
+
+En la nube no se usan las credenciales por defecto de la tabla 14.2: el
+script genera claves aleatorias en `.env.gcp` (ignorado por git).
+
+> Mejoras para producción: MQTT con TLS (8883), proxy inverso con HTTPS para
+> Grafana y un token de InfluxDB de solo lectura para Grafana.
 
 ### 14.9 Solución de problemas MQTT
 
@@ -1125,6 +1147,8 @@ Resumen:
 | El bridge no registra lecturas | Topics no coinciden | Publica en `invernadero1/temperatura` y `/humedad` |
 | Grafana muestra `DatasourceError` | Token u org incorrectos | Revisa `INFLUX_ORG`/`INFLUX_TOKEN` y reinicia Grafana |
 | Alertas en `NoData` | Sin datos en los últimos 5 min | Envía lecturas nuevas con el simulador |
+| `input data must be a wide series` | La consulta deja columnas de etiqueta sueltas | Usa `keep(...)` y `group(...)` antes de `last()`, como en `alert-rules.yml` |
+| `docker compose` falla con `Define ... en mqtt/.env` | Falta una clave en el override de GCP | Copia `mqtt/.env.example` a `mqtt/.env` y complétalo |
 | El dashboard no carga series | Variable `bucket` distinta de `iot` | Ajusta la variable o el bucket |
 
 ---

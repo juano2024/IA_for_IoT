@@ -7,19 +7,25 @@
 
 ## 1. Alcance de esta entrega
 
+**Caso de uso:** condiciones del cultivo de tomate en invernadero. El rango
+óptimo es de 15–30 °C y 60–80 % de humedad relativa; por debajo de 12–15 °C y
+por encima de 30–35 °C hay problemas de desarrollo y fructificación (fuente:
+Infoagro, [*El cultivo del tomate*](https://www.infoagro.com/documentos/el_cultivo_del_tomate__parte_i_.asp)).
+
 | Punto de la guía | Estado | Dónde se implementa |
 |---|---|---|
+| **2. Máquina virtual en la nube con broker MQTT** | ✅ Implementado (Google Cloud) | `scripts/gcp_practica2.ps1`, `deploy/gcp_mqtt_startup.sh` |
+| **3. ESP32 con usuario y contraseña; grupo de seguridad** | ✅ Implementado | `firmware/esp32_dht11_mqtt/`, reglas de firewall (sección 8.3) |
+| **6. Base de datos separada de Internet** | ✅ Implementado | `mqtt/docker-compose.gcp.yml` (InfluxDB sin puerto publicado) |
 | **4. Almacenamiento de datos en InfluxDB y CSV** | ✅ Implementado y probado | `src/ia_for_iot/mqtt_bridge.py`, `mqtt/docker-compose.yml` |
 | **5. Visualización en Grafana con alertas y notificaciones** | ✅ Implementado y probado | `mqtt/grafana/`, `mqtt/notifier/` |
 | Broker MQTT (Mosquitto) | ✅ Implementado y probado | `mqtt/mosquitto/` |
 | Firmware ESP32 con MQTT | ✅ Implementado y compilado | `firmware/esp32_dht11_mqtt/` |
-| Despliegue en AWS (VPC, subred, SG, EC2) | 📄 Documentado (pasos en la sección 8) | — |
 
-La validación de extremo a extremo se realizó en la VM Ubuntu de Vagrant
-(Windows 10 + VirtualBox 7.2 + Vagrant 2.4.9), que ejecuta exactamente el mismo
-`docker-compose.yml` que se usaría en AWS. No se desplegó en AWS porque el
-entorno de trabajo no cuenta con credenciales de esa nube; los pasos quedan
-documentados para replicarlo.
+La validación de extremo a extremo se hizo primero en la VM Ubuntu de Vagrant
+(Windows 10 + VirtualBox 7.2 + Vagrant 2.4.9) y después con Docker Desktop,
+con el mismo override que se usa en la nube. El despliegue se hace en Google
+Cloud (sección 8), con la aprobación del profesor.
 
 ---
 
@@ -27,16 +33,35 @@ documentados para replicarlo.
 
 ```mermaid
 flowchart LR
-    ESP32["ESP32 + DHT11<br/>(o simulador)"] -->|"MQTT QoS 1<br/>invernadero1/temperatura<br/>invernadero1/humedad"| MQ["Mosquitto<br/>:1883"]
-    MQ --> BR["Bridge<br/>mqtt-bridge"]
-    BR -->|"Flux / HTTP"| INF[("InfluxDB 2.7<br/>bucket iot")]
-    BR --> CSV[("data/lecturas.csv")]
-    INF --> GRAF["Grafana<br/>:3000"]
-    GRAF -->|"webhook"| NOT["Notifier<br/>:8080/alert"]
-    GRAF -->|"dashboard"| USER["Navegador"]
+    ESP32["ESP32 + DHT11<br/>(o simulador)"] -->|"MQTT QoS 1, usuario y clave<br/>invernadero1/temperatura<br/>invernadero1/humedad"| FW
+    USER["Navegador"] -->|"HTTP :3000"| FW
+    subgraph GCP["Google Cloud: proyecto ia-iot-p2"]
+        FW{{"Firewall de la VPC<br/>abre 1883 y 3000<br/>8086 cerrado"}}
+        subgraph VM["VM iot-p2-vm: e2-micro, IP estática"]
+            MQ["Mosquitto<br/>:1883"]
+            GRAF["Grafana<br/>:3000"]
+            CSV[("data/lecturas.csv")]
+            subgraph RED["Red interna de Docker"]
+                BR["Bridge<br/>mqtt-bridge"]
+                INF[("InfluxDB 2.7<br/>bucket iot")]
+                NOT["Notifier<br/>:8080/alert"]
+            end
+        end
+    end
+    FW --> MQ
+    FW --> GRAF
+    MQ --> BR
+    BR -->|"Flux / HTTP"| INF
+    BR --> CSV
+    INF --> GRAF
+    GRAF -->|"webhook"| NOT
 ```
 
-| Servicio | Imagen | Puerto | Credenciales por defecto |
+InfluxDB no publica ningún puerto en la nube: solo el puente y Grafana lo
+alcanzan por la red interna de Docker. Así se cumple el punto 6 de la guía
+(base de datos separada de Internet) sin una segunda VM.
+
+| Servicio | Imagen | Puerto | Credenciales en local (en GCP se generan claves aleatorias) |
 |---|---|---|---|
 | `mosquitto` | `eclipse-mosquitto:2` | 1883 | `iot` / `iot2026` |
 | `influxdb` | `influxdb:2.7` | 8086 | `admin` / `admin12345` |
@@ -54,7 +79,7 @@ flowchart LR
    `invernadero1/humedad` con QoS 1.
 2. `mqtt_bridge.py` se suscribe a `invernadero1/#`, empareja ambas magnitudes
    dentro de una ventana de 60 s (`MQTT_PAIR_TTL`) y descarta pares incompletos.
-3. Evalúa los umbrales con `service.evaluar()` (18–22 °C, 40–60 %).
+3. Evalúa los umbrales con `service.evaluar()` (15–30 °C, 60–80 %).
 4. Escribe el punto en **InfluxDB** y la fila en **CSV** (doble persistencia).
 
 ### 3.2 Esquema en InfluxDB
@@ -124,24 +149,30 @@ Al arrancar, Grafana carga desde `mqtt/grafana/provisioning/`:
 | Temperatura actual | Stat | Último `temperatura_c` de la última hora |
 | Humedad actual | Stat | Último `humedad_pct` de la última hora |
 | Estado de confort | Stat | Último `estado` (OK/ALERTA) |
-| Temperatura con banda 18–22 °C | Time series | Media por ventana + umbrales |
-| Humedad con banda 40–60 % | Time series | Media por ventana + umbrales |
+| Temperatura con banda 15–30 °C | Time series | Media por ventana + umbrales |
+| Humedad con banda 60–80 % | Time series | Media por ventana + umbrales |
 
 Los cinco paneles se validaron contra la API de Grafana (`/api/ds/query`):
-`panel 1..5: OK`.
+cada uno devuelve una sola serie con el último valor publicado.
 
 ### 4.3 Reglas de alerta
 
 | Alerta | Condición | Severidad |
 |---|---|---|
-| Temperatura alta | último valor > 22 °C | critical |
-| Temperatura baja | último valor < 18 °C | critical |
-| Humedad alta | último valor > 60 % | warning |
-| Humedad baja | último valor < 40 % | warning |
+| Temperatura alta | último valor > 30 °C | critical |
+| Temperatura baja | último valor < 15 °C | critical |
+| Humedad alta | último valor > 80 % | warning |
+| Humedad baja | último valor < 60 % | warning |
 
 Cada regla evalúa la consulta Flux cada 10 s, reduce con `last()` y compara con
 el umbral. Se usa `classic_conditions` porque la expresión `threshold` no reduce
 series temporales (`only reduced data can be alerted on`).
+
+Antes de `last()`, las consultas de alertas y paneles conservan solo `_time`,
+`_value`, `_field` y `dispositivo`, y agrupan por dispositivo. Sin ese paso, la
+etiqueta `estado` separaba los datos en una serie OK y otra ALERTA: `last()`
+devolvía el último valor de cada una y la alerta seguía disparada hasta 5
+minutos después de normalizarse la lectura.
 
 ### 4.4 Notificaciones
 
@@ -159,32 +190,34 @@ validación para no requerir credenciales SMTP).
 
 ### 4.5 Evidencia de alertas
 
-Lecturas forzadas a 30,5 °C y 80 %:
+Validación con Docker Desktop y el override de GCP (31 de octubre de 2026).
+Lecturas forzadas a 12 °C y 85 %, y luego normales a 24 °C y 70 %:
 
 ```powershell
-uv run simular-esp32-mqtt --host 127.0.0.1 --user iot --password iot2026 `
-  --count 2 --interval 2 --temperatura 30.5 --humedad 80
+uv run simular-esp32-mqtt --host 127.0.0.1 --user iot --password <clave> `
+  --count 2 --interval 1 --temperatura 12 --humedad 85
+uv run simular-esp32-mqtt --host 127.0.0.1 --user iot --password <clave> `
+  --count 2 --interval 1 --temperatura 24 --humedad 70
 ```
 
-Estado de las reglas 20 s después:
+Estado de las reglas 25 s después de cada envío:
 
 ```
-Temperatura alta (mas de 22 C) -> firing (ok)   Alerting valor=30.5
-Humedad alta (mas de 60 %)     -> firing (ok)   Alerting valor=80
-Temperatura baja (menos de 18 C) -> inactive
-Humedad baja (menos de 40 %)     -> inactive
+fuera de rango: Temperatura alta=inactive, Temperatura baja=firing, Humedad alta=firing, Humedad baja=inactive
+normal:         Temperatura alta=inactive, Temperatura baja=inactive, Humedad alta=inactive, Humedad baja=inactive
 ```
 
 Registro del notificador:
 
 ```
-2026-10-31T03:13:45 [firing] [FIRING:1] Temperatura alta (mas de 22 C) IA for IoT (temperatura alta critical)
-2026-10-31T03:13:45 [firing] [FIRING:1] Humedad alta (mas de 60 %) IA for IoT (humedad alta warning)
+2026-10-31T12:15:15 [firing] [FIRING:1] Humedad alta (mas de 80 %) IA for IoT (humedad alta warning)
+2026-10-31T12:15:17 [firing] [FIRING:1] Temperatura baja (menos de 15 C) IA for IoT (temperatura baja critical)
+2026-10-31T12:15:45 [resolved] [RESOLVED] Humedad alta (mas de 80 %) IA for IoT (humedad alta warning)
+2026-10-31T12:15:47 [resolved] [RESOLVED] Temperatura baja (menos de 15 C) IA for IoT (temperatura baja critical)
 ```
 
-Al volver a enviar lecturas normales (≈21 °C / 54 %), las cuatro reglas
-volvieron a `inactive`, lo que demuestra el ciclo completo
-`firing → resolved`.
+El ciclo `firing → resolved` se completa en unos 30 s. En la misma prueba, el
+broker rechazó las conexiones sin clave y con clave errada (`Not authorized`).
 
 ---
 
@@ -232,7 +265,9 @@ arduino-cli upload -p COM3 --fqbn esp32:esp32:esp32 firmware/esp32_dht11_mqtt
 ```
 
 Ajustes en el sketch: `WIFI_SSID`, `WIFI_PASS`, `MQTT_HOST` (IP LAN del PC con
-Vagrant o IP pública de la EC2), `MQTT_USER` y `MQTT_PASS`.
+Vagrant o IP externa de la VM en Google Cloud), `MQTT_USER` y `MQTT_PASS`. En el
+repositorio quedan como marcadores; los valores reales se comparten por un
+canal privado.
 
 ---
 
@@ -249,155 +284,145 @@ arduino-cli compile ...   # firmware MQTT compila
 | API de la Práctica 1 | 11/11 |
 | Puente MQTT (interpretación, emparejamiento, punto Influx, CSV) | 10/10 |
 | Dashboard (5 paneles) | 5/5 consultas válidas |
-| Alertas (4 reglas) | `firing` con 30,5 °C / 80 %, `inactive` al normalizar |
+| Alertas (4 reglas) | `firing` con 12 °C / 85 %, `resolved` al normalizar (unos 30 s) |
 | Notificador | Recibe webhook y escribe `notificaciones.log` |
 | Firmware MQTT | Compila (68 % flash, 14 % RAM) |
 
 ---
 
-## 8. Despliegue en AWS (pasos documentados)
+## 8. Despliegue en Google Cloud
 
-> Estos comandos son una referencia; no se ejecutaron porque el entorno no
-> tiene credenciales de AWS. Los nombres y la región son ejemplos
-> (`us-east-1`). Sustituye los identificadores por los que devuelva cada
-> comando.
+El profesor aprobó usar Google Cloud en lugar de AWS. Todo se crea con
+`scripts/gcp_practica2.ps1` en un proyecto exclusivo para esta práctica, que
+se elimina al terminar. La VM es `e2-micro`, que entra en la capa gratuita.
 
-### 8.1 Crear la VPC y la subred pública
+### 8.1 Equivalencias AWS ↔ GCP
 
-```bash
-# VPC 10.0.0.0/16
-aws ec2 create-vpc --cidr-block 10.0.0.0/16 --tag-specifications \
-  'ResourceType=vpc,Tags=[{Key=Name,Value=ia-for-iot-vpc}]'
-
-# Subred pública 10.0.1.0/24
-aws ec2 create-subnet --vpc-id <VPC_ID> --cidr-block 10.0.1.0/24 \
-  --availability-zone us-east-1a --tag-specifications \
-  'ResourceType=subnet,Tags=[{Key=Name,Value=ia-for-iot-publica}]'
-```
-
-En la consola: **VPC → Crear VPC → VPC y más → con subred pública**, CIDR
-`10.0.0.0/16`, subred `10.0.1.0/24`.
-
-### 8.2 Internet Gateway y tabla de rutas
-
-```bash
-aws ec2 create-internet-gateway --tag-specifications \
-  'ResourceType=internet-gateway,Tags=[{Key=Name,Value=ia-for-iot-igw}]'
-aws ec2 attach-internet-gateway --vpc-id <VPC_ID> --internet-gateway-id <IGW_ID>
-
-aws ec2 create-route-table --vpc-id <VPC_ID> --tag-specifications \
-  'ResourceType=route-table,Tags=[{Key=Name,Value=ia-for-iot-rt}]'
-aws ec2 create-route --route-table-id <RT_ID> \
-  --destination-cidr-block 0.0.0.0/0 --gateway-id <IGW_ID>
-aws ec2 associate-route-table --route-table-id <RT_ID> --subnet-id <SUBNET_ID>
-```
-
-La subred debe tener **asignación automática de IP pública** activada
-(consola: Subred → Acciones → Editar atributos de subred).
-
-### 8.3 Security Group
-
-| Puerto | Protocolo | Origen | Uso |
-|---|---|---|---|
-| 22 | TCP | Tu IP | SSH |
-| 8080 | TCP | 0.0.0.0/0 (o tu IP) | API de la Práctica 1 |
-| 1883 | TCP | 0.0.0.0/0 | MQTT (idealmente TLS 8883) |
-| 3000 | TCP | Tu IP | Grafana |
-| 8086 | TCP | Tu IP | InfluxDB (solo administración) |
-
-```bash
-aws ec2 create-security-group --group-name ia-for-iot-sg \
-  --description "Practica 2 IoT" --vpc-id <VPC_ID>
-
-aws ec2 authorize-security-group-ingress --group-id <SG_ID> \
-  --ip-permissions \
-  'IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=TU_IP/32}]' \
-  'IpProtocol=tcp,FromPort=8080,ToPort=8080,IpRanges=[{CidrIp=0.0.0.0/0}]' \
-  'IpProtocol=tcp,FromPort=1883,ToPort=1883,IpRanges=[{CidrIp=0.0.0.0/0}]' \
-  'IpProtocol=tcp,FromPort=3000,ToPort=3000,IpRanges=[{CidrIp=TU_IP/32}]' \
-  'IpProtocol=tcp,FromPort=8086,ToPort=8086,IpRanges=[{CidrIp=TU_IP/32}]'
-```
-
-> El Security Group es el control real de acceso. `ufw` dentro de la instancia
-> no filtra el tráfico de los puertos publicados por Docker (Docker inserta sus
-> propias reglas de iptables).
-
-### 8.4 Crear la instancia EC2
-
-```bash
-# AMI más reciente de Ubuntu 22.04
-aws ec2 describe-images --owners 099720109477 \
-  --filters 'Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*' \
-  --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text
-
-aws ec2 create-key-pair --key-name ia-for-iot-key \
-  --query 'KeyMaterial' --output text > ia-for-iot-key.pem
-
-aws ec2 run-instances --image-id <AMI_ID> --instance-type t3.small \
-  --key-name ia-for-iot-key --security-group-ids <SG_ID> \
-  --subnet-id <SUBNET_ID> --block-device-mappings \
-  'DeviceName=/dev/sda1,Ebs={VolumeSize=20,VolumeType=gp3}' \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ia-for-iot}]'
-```
-
-`t3.small` (2 vCPU, 2 GB) es el mínimo recomendado para los cinco contenedores.
-`t3.micro` (1 GB) puede quedarse sin memoria al compilar la imagen.
-
-### 8.5 Instalar Docker y desplegar
-
-```bash
-ssh -i ia-for-iot-key.pem ubuntu@<IP_PUBLICA>
-
-sudo apt update && sudo apt install -y ca-certificates curl git
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker ubuntu
-newgrp docker
-
-git clone https://github.com/juano2024/IA_for_IoT.git
-cd IA_for_IoT
-docker compose -f mqtt/docker-compose.yml up -d --build
-```
-
-Comprobaciones:
-
-```bash
-docker compose -f mqtt/docker-compose.yml ps
-curl http://127.0.0.1:3000/api/health
-curl http://127.0.0.1:8086/health
-```
-
-### 8.6 Elastic IP y firmware
-
-```bash
-aws ec2 allocate-address --domain vpc
-aws ec2 associate-address --instance-id <INSTANCE_ID> --allocation-id <EIP_ID>
-```
-
-Actualiza `MQTT_HOST` en `firmware/esp32_dht11_mqtt/esp32_dht11_mqtt.ino` con
-la IP elástica y vuelve a cargar el sketch.
-
-### 8.7 Endurecimiento recomendado
-
-1. **TLS en MQTT** (puerto 8883) con certificados de Let's Encrypt y
-   `allow_anonymous false`.
-2. **Proxy inverso** (Caddy o Nginx) delante de Grafana con HTTPS.
-3. **Token de InfluxDB de solo lectura** para Grafana; no reutilizar el token
-   de administración.
-4. Contraseñas fuertes en `.env` (Mosquitto, InfluxDB, Grafana).
-5. Copias de seguridad: `influx backup /ruta/backup` y snapshot del volumen
-   `influxdb-data`.
-6. CloudWatch para CPU, disco y estado de la instancia.
-
-### 8.8 Costos aproximados (us-east-1)
-
-| Recurso | Costo aproximado |
+| Lo que pide la guía (AWS) | Implementación en Google Cloud |
 |---|---|
-| `t3.small` 24/7 | ~15 USD/mes |
-| EBS gp3 20 GB | ~1,6 USD/mes |
-| Elastic IP asociada | 0 USD |
-| Transferencia saliente | ~0,09 USD/GB |
+| Instancia EC2 | VM de Compute Engine `iot-p2-vm`, `e2-micro`, Ubuntu 22.04, `us-central1-a` |
+| Elastic IP | IP externa estática `iot-p2-ip` |
+| Security Group | Reglas de firewall de la VPC sobre la etiqueta de red `iot-p2` |
+| Base de datos separada | InfluxDB sin puerto publicado: solo existe en la red interna de Docker de la VM y ninguna regla de firewall la expone |
+| User data | Startup script en los metadatos de la VM (`deploy/gcp_mqtt_startup.sh`) |
+| Key pair y SSH | `gcloud compute ssh` por IAP, sin SSH abierto a Internet |
 
-> `t3.small` no entra en la capa gratuita (solo `t2.micro`/`t3.micro`).
+Google Cloud no tiene un servicio administrado equivalente a AWS IoT Core
+(Cloud IoT Core se retiró en 2023). Por eso el broker es Mosquitto propio en la
+VM, el patrón que Google describe en su arquitectura de
+[broker MQTT independiente](https://docs.cloud.google.com/architecture/connected-devices/mqtt-broker-architecture).
+
+### 8.2 Desplegar
+
+```powershell
+gcloud auth login                      # cuenta con acceso a la facturación
+.\scripts\gcp_practica2.ps1 -Up -ProjectId ia-iot-p2-2026 -BillingAccount <ID_FACTURACION>
+.\scripts\gcp_practica2.ps1 -Status -ProjectId ia-iot-p2-2026
+```
+
+`-Up` es idempotente y hace, en orden:
+
+1. Crea el proyecto, lo vincula a la cuenta de facturación y habilita
+   Compute Engine e IAP.
+2. Reserva la IP externa estática en `us-central1`.
+3. Crea las reglas de firewall de la sección 8.3 y borra `default-allow-ssh`
+   y `default-allow-rdp`.
+4. Genera claves aleatorias en `.env.gcp` (ignorado por git), si no existen.
+5. Crea la VM con disco estándar de 20 GB, la etiqueta `iot-p2`, el startup
+   script y las claves en los metadatos.
+
+### 8.3 Firewall
+
+| Regla | Puertos | Origen | Uso |
+|---|---|---|---|
+| `iot-p2-mqtt-grafana` | TCP 1883, 3000 | `0.0.0.0/0` | ESP32 de los compañeros y panel de Grafana |
+| `iot-p2-ssh-iap` | TCP 22 | `35.235.240.0/20` | SSH solo a través de IAP |
+| Ninguna | TCP 8086 | — | InfluxDB queda cerrado a Internet |
+
+El firewall de la VPC filtra fuera de la VM, así que también se aplica a los
+puertos que publica Docker.
+
+### 8.4 Startup script
+
+[`deploy/gcp_mqtt_startup.sh`](deploy/gcp_mqtt_startup.sh) se ejecuta en cada
+arranque y nunca borra datos:
+
+1. Instala Docker Engine y Docker Compose si faltan.
+2. Crea 2 GB de intercambio para construir la imagen en la `e2-micro`.
+3. Clona la rama `practica-2-mqtt` en `/opt/ia_for_iot` o la actualiza.
+4. Escribe `mqtt/.env` (permiso 600) con las claves de los metadatos.
+5. Levanta el stack con el override
+   [`mqtt/docker-compose.gcp.yml`](mqtt/docker-compose.gcp.yml) y espera a
+   que Grafana responda.
+
+El override quita la publicación del 8086, exige las contraseñas (sin valores
+por defecto) y desactiva el acceso anónimo a Grafana. Los datos viven en
+volúmenes de Docker con nombre y en `data/`, que git no toca.
+
+### 8.5 Claves
+
+| Clave | Quién la usa |
+|---|---|
+| `MQTT_USERNAME` / `MQTT_PASSWORD` | ESP32, simulador y MQTT Explorer |
+| `GRAFANA_ADMIN_PASSWORD` | Acceso al panel (`admin`) |
+| `INFLUX_ADMIN_PASSWORD` / `INFLUX_TOKEN` | Solo dentro de la VM (puente y Grafana) |
+
+Se comparten con el equipo por un canal privado. Nunca se suben al
+repositorio ni se escriben en el firmware publicado.
+
+### 8.6 Verificación
+
+```powershell
+# Desde el PC: publicar en el broker de la nube
+uv run simular-esp32-mqtt --host <IP> --user iot --password <MQTT_PASSWORD> --count 5 --interval 2
+
+# Sin clave, el broker debe rechazar la conexión
+uv run simular-esp32-mqtt --host <IP> --count 1
+
+# InfluxDB no debe responder desde Internet
+Test-NetConnection <IP> -Port 8086
+```
+
+Dentro de la VM (`gcloud compute ssh iot-p2-vm --tunnel-through-iap`):
+
+```bash
+cd /opt/ia_for_iot
+sudo docker compose -f mqtt/docker-compose.yml -f mqtt/docker-compose.gcp.yml ps
+wc -l data/lecturas.csv
+sudo tail -n 5 mqtt/notifier/data/notificaciones.log
+```
+
+### 8.7 Costos
+
+| Recurso | Costo |
+|---|---|
+| VM `e2-micro` | US$0: una `e2-micro` al mes es gratuita en `us-central1`, `us-west1` o `us-east1` |
+| Disco estándar de 20 GB | US$0 dentro de los 30 GB-mes gratuitos |
+| IP externa en uso | US$0.005 por hora (unos US$0.12 al día) |
+| Tráfico saliente | 1 GB al mes gratuito desde Norteamérica |
+
+Fuentes: [capa gratuita de Google Cloud](https://docs.cloud.google.com/free/docs/free-cloud-features)
+y [precio de las IP externas](https://cloud.google.com/vpc/pricing-announce-external-ips).
+En la validación local los cinco contenedores usaron unos 250 MB de memoria,
+por lo que caben en el 1 GB de la `e2-micro`.
+
+### 8.8 Desmontaje
+
+```powershell
+.\scripts\gcp_practica2.ps1 -Down -ProjectId ia-iot-p2-2026
+gcloud projects describe ia-iot-p2-2026 --format "value(lifecycleState)"   # DELETE_REQUESTED
+```
+
+Borrar el proyecto elimina la VM, el disco, la IP y las reglas de firewall, y
+detiene todos los cobros. El script solo acepta proyectos `ia-iot-p2-*`.
+
+### 8.9 Endurecimiento recomendado
+
+1. **TLS en MQTT** (puerto 8883) y certificados en el ESP32.
+2. **Proxy inverso** (Caddy o Nginx) delante de Grafana con HTTPS.
+3. **Token de InfluxDB de solo lectura** para Grafana.
+4. Copias de seguridad: `influx backup` y snapshot del disco.
+5. Cloud Monitoring para CPU, memoria y disco de la VM.
 
 ---
 
@@ -406,6 +431,8 @@ la IP elástica y vuelve a cargar el sketch.
 ```
 mqtt/
 ├── docker-compose.yml                  # Mosquitto, InfluxDB, Grafana, bridge y notifier
+├── docker-compose.gcp.yml              # Override de GCP: InfluxDB interno y claves obligatorias
+├── .env.example                        # Claves y rangos del stack
 ├── mosquitto/
 │   ├── mosquitto.conf                  # Autenticación obligatoria
 │   └── entrypoint.sh                   # Genera el archivo de usuarios
@@ -427,15 +454,20 @@ src/ia_for_iot/
 tests/test_mqtt_bridge.py               # 10 pruebas
 firmware/esp32_dht11_mqtt/              # Sketch MQTT del ESP32
 scripts/mqtt_vm.ps1                     # Despliegue del stack en la VM
+scripts/gcp_practica2.ps1               # Crea, revisa y borra el despliegue en GCP
+deploy/gcp_mqtt_startup.sh              # Startup script de la VM en GCP
 ```
 
 ---
 
 ## 10. Limitaciones y trabajo futuro
 
-- La validación se hizo con el simulador MQTT; no había ESP32 físico
-  disponible. El sketch compila y replica el mismo contrato de topics.
-- El despliegue en AWS quedó documentado, no ejecutado.
-- Las notificaciones por correo requieren credenciales SMTP del proveedor.
+- La validación local se hizo con el simulador MQTT. El sketch compila y
+  replica el mismo contrato de topics.
+- El despliegue en Google Cloud es temporal: el proyecto se elimina después
+  de tomar las evidencias, para no generar costos.
+- MQTT viaja sin TLS: la clave del broker no va cifrada por Internet.
+- Las notificaciones llegan al webhook del notificador; por correo requieren
+  credenciales SMTP del proveedor.
 - Para producción: TLS en MQTT/Grafana, alta disponibilidad de InfluxDB y
   retención por capas (downsampling).

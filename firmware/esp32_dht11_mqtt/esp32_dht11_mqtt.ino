@@ -2,7 +2,8 @@
  * IA for IoT - Practica 2
  * ESP32 + DHT11 -> broker MQTT -> puente -> InfluxDB + CSV -> Grafana
  *
- * Caso de uso: monitoreo de confort termico y respiratorio en un invernadero.
+ * Caso de uso: condiciones optimas del cultivo de tomate en invernadero
+ *              (15-30 C y 60-80 % de humedad relativa).
  *
  * CABLEADO
  *   DHT11 VCC   -> 3.3V del ESP32
@@ -24,7 +25,9 @@
  * AJUSTES: completa las credenciales de Wi-Fi y la IP del broker MQTT.
  *   - En local con Vagrant, MQTT_HOST es la IP LAN del PC anfitrion
  *     (por ejemplo 192.168.18.14) y el puerto 1883 esta reenviado a la VM.
- *   - En AWS, MQTT_HOST es la IP publica o el DNS de la instancia EC2.
+ *   - En Google Cloud, MQTT_HOST es la IP externa estatica de la VM
+ *     (la imprime scripts/gcp_practica2.ps1 -Up). Usuario y clave se
+ *     comparten por un canal privado; no los subas al repositorio.
  */
 
 #include <WiFi.h>
@@ -37,11 +40,11 @@
 #define WIFI_SSID       "TU_NOMBRE_WIFI"
 #define WIFI_PASS       "TU_CLAVE_WIFI"
 
-// Broker MQTT: IP LAN del PC (Vagrant) o IP publica de la instancia EC2.
-#define MQTT_HOST       "192.168.18.14"
+// Broker MQTT: IP LAN del PC (Vagrant) o IP externa de la VM en Google Cloud.
+#define MQTT_HOST       "IP_DEL_BROKER"
 #define MQTT_PORT       1883
-#define MQTT_USER       "iot"
-#define MQTT_PASS       "iot2026"
+#define MQTT_USER       "TU_USUARIO_MQTT"
+#define MQTT_PASS       "TU_CLAVE_MQTT"
 
 // ------------------------------------------------------------------
 // 2. CONFIGURACION DE PINES Y SENSOR (DHT11)

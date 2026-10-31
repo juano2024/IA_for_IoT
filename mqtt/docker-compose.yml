@@ -115,10 +115,10 @@ services:
       INFLUX_BUCKET: "${INFLUX_BUCKET:-iot}"
       INFLUX_MEASUREMENT: "${INFLUX_MEASUREMENT:-clima}"
       CSV_PATH: "/app/data/lecturas.csv"
-      TEMP_MIN: "${TEMP_MIN:-18}"
-      TEMP_MAX: "${TEMP_MAX:-22}"
-      HUM_MIN: "${HUM_MIN:-40}"
-      HUM_MAX: "${HUM_MAX:-60}"
+      TEMP_MIN: "${TEMP_MIN:-15}"
+      TEMP_MAX: "${TEMP_MAX:-30}"
+      HUM_MIN: "${HUM_MIN:-60}"
+      HUM_MAX: "${HUM_MAX:-80}"
     volumes:
       - ../data:/app/data
     healthcheck:

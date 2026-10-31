@@ -50,7 +50,7 @@
             "type": "influxdb",
             "uid": "influxdb-iot"
           },
-          "query": "from(bucket: \"${bucket}\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"temperatura_c\") |> last()",
+          "query": "from(bucket: \"${bucket}\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"temperatura_c\") |> keep(columns: [\"_time\", \"_value\", \"_field\", \"dispositivo\"]) |> group(columns: [\"_field\", \"dispositivo\"]) |> sort(columns: [\"_time\"]) |> last()",
           "rawQuery": true,
           "resultFormat": "time_series"
         }
@@ -79,11 +79,11 @@
               },
               {
                 "color": "green",
-                "value": 18
+                "value": 15
               },
               {
                 "color": "red",
-                "value": 22
+                "value": 30
               }
             ]
           }
@@ -112,7 +112,7 @@
             "type": "influxdb",
             "uid": "influxdb-iot"
           },
-          "query": "from(bucket: \"${bucket}\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"humedad_pct\") |> last()",
+          "query": "from(bucket: \"${bucket}\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"humedad_pct\") |> keep(columns: [\"_time\", \"_value\", \"_field\", \"dispositivo\"]) |> group(columns: [\"_field\", \"dispositivo\"]) |> sort(columns: [\"_time\"]) |> last()",
           "rawQuery": true,
           "resultFormat": "time_series"
         }
@@ -141,11 +141,11 @@
               },
               {
                 "color": "green",
-                "value": 40
+                "value": 60
               },
               {
                 "color": "red",
-                "value": 60
+                "value": 80
               }
             ]
           }
@@ -174,7 +174,7 @@
             "type": "influxdb",
             "uid": "influxdb-iot"
           },
-          "query": "from(bucket: \"${bucket}\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"alerta\") |> last()",
+          "query": "from(bucket: \"${bucket}\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"alerta\") |> keep(columns: [\"_time\", \"_value\", \"_field\", \"dispositivo\"]) |> group(columns: [\"_field\", \"dispositivo\"]) |> sort(columns: [\"_time\"]) |> last()",
           "rawQuery": true,
           "resultFormat": "time_series"
         }
@@ -227,7 +227,7 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Temperatura (C) con banda de confort 18-22",
+      "title": "Temperatura (C) con banda optima 15-30",
       "gridPos": {
         "x": 0,
         "y": 4,
@@ -245,7 +245,7 @@
             "type": "influxdb",
             "uid": "influxdb-iot"
           },
-          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"temperatura_c\") |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false) |> yield(name: \"temperatura\")",
+          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"temperatura_c\") |> keep(columns: [\"_time\", \"_value\", \"_field\", \"dispositivo\"]) |> group(columns: [\"_field\", \"dispositivo\"]) |> sort(columns: [\"_time\"]) |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false) |> yield(name: \"temperatura\")",
           "rawQuery": true,
           "resultFormat": "time_series"
         }
@@ -280,11 +280,11 @@
               },
               {
                 "color": "green",
-                "value": 18
+                "value": 15
               },
               {
                 "color": "red",
-                "value": 22
+                "value": 30
               }
             ]
           }
@@ -306,7 +306,7 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Humedad (%) con banda de confort 40-60",
+      "title": "Humedad (%) con banda optima 60-80",
       "gridPos": {
         "x": 12,
         "y": 4,
@@ -324,7 +324,7 @@
             "type": "influxdb",
             "uid": "influxdb-iot"
           },
-          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"humedad_pct\") |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false) |> yield(name: \"humedad\")",
+          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"clima\" and r._field == \"humedad_pct\") |> keep(columns: [\"_time\", \"_value\", \"_field\", \"dispositivo\"]) |> group(columns: [\"_field\", \"dispositivo\"]) |> sort(columns: [\"_time\"]) |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false) |> yield(name: \"humedad\")",
           "rawQuery": true,
           "resultFormat": "time_series"
         }
@@ -359,11 +359,11 @@
               },
               {
                 "color": "green",
-                "value": 40
+                "value": 60
               },
               {
                 "color": "red",
-                "value": 60
+                "value": 80
               }
             ]
           }
