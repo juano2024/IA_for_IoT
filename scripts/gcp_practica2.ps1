@@ -48,14 +48,26 @@ $Tag = "iot-p2"
 
 function Invoke-Gcloud {
     # Ejecuta gcloud y falla si el comando devuelve un codigo distinto de 0.
-    gcloud @args
+    # gcloud escribe el progreso en stderr: se muestra como texto y solo se
+    # considera error el codigo de salida.
+    $ErrorActionPreference = "Continue"
+    gcloud @args 2>&1 | ForEach-Object { "$_" }
     if ($LASTEXITCODE -ne 0) { throw "Fallo: gcloud $($args -join ' ')" }
 }
 
 function Test-Gcloud {
     # Devuelve $true si el comando gcloud termina bien (sin mostrar salida).
+    $ErrorActionPreference = "Continue"
     gcloud @args *> $null
     return ($LASTEXITCODE -eq 0)
+}
+
+function Get-Gcloud {
+    # Devuelve la salida estandar de gcloud, sin el progreso de stderr.
+    $ErrorActionPreference = "Continue"
+    $salida = gcloud @args 2> $null
+    if ($LASTEXITCODE -ne 0) { throw "Fallo: gcloud $($args -join ' ')" }
+    return ($salida | Out-String).Trim()
 }
 
 function New-Clave {
@@ -120,7 +132,7 @@ if (-not (Test-Gcloud compute addresses describe $Ip --region $Region --project 
     Write-Host "==> Reservando la IP estatica" -ForegroundColor Cyan
     Invoke-Gcloud compute addresses create $Ip --region $Region --project $ProjectId
 }
-$IpPublica = (gcloud compute addresses describe $Ip --region $Region --project $ProjectId --format "value(address)").Trim()
+$IpPublica = Get-Gcloud compute addresses describe $Ip --region $Region --project $ProjectId --format "value(address)"
 
 # 3. Firewall: MQTT y Grafana abiertos; SSH solo por IAP; InfluxDB cerrado
 if (-not (Test-Gcloud compute firewall-rules describe "$Tag-mqtt-grafana" --project $ProjectId)) {
