@@ -961,14 +961,14 @@ broker MQTT, un puente guarda cada lectura en InfluxDB y en el CSV, y Grafana
 visualiza y alerta. Todo se levanta con Docker Compose dentro de la misma VM
 de la Práctica 1 y se despliega en Google Cloud (sección 14.8).
 
-Caso de uso: **condiciones de confort en un invernadero**. Rangos
+Caso de uso: **condiciones de confort en un cuarto**. Rangos
 óptimos: 15–30 °C y 60–80 % de humedad relativa (fuente: guías de cultivo).
 
 ### 14.1 Arquitectura
 
 ```mermaid
 flowchart LR
-    ESP32["ESP32 + DHT11<br/>(o simulador)"] -->|"MQTT QoS 1<br/>invernadero1/temperatura<br/>invernadero1/humedad"| MQ["Mosquitto<br/>:1883"]
+    ESP32["ESP32 + DHT11<br/>(o simulador)"] -->|"MQTT QoS 1<br/>cuarto1/temperatura<br/>cuarto1/humedad"| MQ["Mosquitto<br/>:1883"]
     MQ --> BR["Bridge<br/>mqtt-bridge"]
     BR -->|"Flux / HTTP"| INF[("InfluxDB 2.7<br/>bucket iot")]
     BR --> CSV[("data/lecturas.csv")]
@@ -982,7 +982,7 @@ flowchart LR
 | `mosquitto` | `eclipse-mosquitto:2` | 1883 | Broker MQTT con usuario y contraseña |
 | `influxdb` | `influxdb:2.7` | 8086 (en GCP no se publica) | Base de datos de series de tiempo (bucket `iot`) |
 | `grafana` | `grafana/grafana-oss:11.6.0` | 3000 | Dashboards y alertas |
-| `bridge` | `ia-for-iot:latest` | — | Suscribe `invernadero1/#` y escribe InfluxDB + CSV |
+| `bridge` | `ia-for-iot:latest` | — | Suscribe `cuarto1/#` y escribe InfluxDB + CSV |
 | `notifier` | `python:3.14-slim` | — | Recibe los webhooks de alerta y los registra |
 
 ### 14.2 Levantar el stack
@@ -1017,9 +1017,9 @@ docker compose -f mqtt/docker-compose.yml logs -f bridge notifier
 
 | Topic | Payload | Ejemplo |
 |---|---|---|
-| `invernadero1/temperatura` | Número en texto | `22.40` |
-| `invernadero1/humedad` | Número en texto | `51.30` |
-| `invernadero1/sensores` | JSON (opcional) | `{"dispositivo":"esp32-dht11","temperatura_c":22.4,"humedad_pct":51.3}` |
+| `cuarto1/temperatura` | Número en texto | `22.40` |
+| `cuarto1/humedad` | Número en texto | `51.30` |
+| `cuarto1/sensores` | JSON (opcional) | `{"dispositivo":"esp32-dht11","temperatura_c":22.4,"humedad_pct":51.3}` |
 
 El puente empareja `temperatura` y `humedad` recibidas en una ventana de
 `MQTT_PAIR_TTL` segundos (60 por defecto) y descarta los pares incompletos.
@@ -1048,7 +1048,7 @@ La retención del bucket es de 30 días.
 El provisioning automático crea:
 
 - Datasource **InfluxDB IoT** (Flux, uid `influxdb-iot`).
-- Dashboard **IA for IoT - Confort del invernadero** (uid `ia-iot-confort`):
+- Dashboard **IA for IoT - Confort del cuarto** (uid `ia-iot-confort`):
   temperatura actual, humedad actual, estado de confort y dos series temporales
   con las bandas de confort, 15–30 °C y 60–80 %.
 - Cuatro reglas de alerta (carpeta `IA for IoT`, evaluación cada 10 s):
@@ -1097,7 +1097,7 @@ Opciones: `--temperatura` y `--humedad` fijan valores para probar alertas;
 ### 14.7 Firmware ESP32 (MQTT)
 
 `firmware/esp32_dht11_mqtt/esp32_dht11_mqtt.ino` publica cada 10 s en
-`invernadero1/temperatura` y `invernadero1/humedad`. Ajusta `WIFI_SSID`,
+`cuarto1/temperatura` y `cuarto1/humedad`. Ajusta `WIFI_SSID`,
 `WIFI_PASS`, `MQTT_HOST` (IP LAN del PC con Vagrant o IP externa de la VM en
 Google Cloud) y las credenciales `MQTT_USER`/`MQTT_PASS`. Esos valores se
 comparten por un canal privado; no se suben al repositorio.
@@ -1143,7 +1143,7 @@ script genera claves aleatorias en `.env.gcp` (ignorado por git).
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | `No se pudo autenticar con el broker` | Faltan `--user/--password` | Añádelos o revisa `MQTT_USERNAME`/`MQTT_PASSWORD` |
-| El bridge no registra lecturas | Topics no coinciden | Publica en `invernadero1/temperatura` y `/humedad` |
+| El bridge no registra lecturas | Topics no coinciden | Publica en `cuarto1/temperatura` y `/humedad` |
 | Grafana muestra `DatasourceError` | Token u org incorrectos | Revisa `INFLUX_ORG`/`INFLUX_TOKEN` y reinicia Grafana |
 | Alertas en `NoData` | Sin datos en los últimos 5 min | Envía lecturas nuevas con el simulador |
 | `input data must be a wide series` | La consulta deja columnas de etiqueta sueltas | Usa `keep(...)` y `group(...)` antes de `last()`, como en `alert-rules.yml` |
