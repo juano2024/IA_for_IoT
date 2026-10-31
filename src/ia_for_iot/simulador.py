@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 
-def _generar_lectura(dev_index: int) -> dict[str, Any]:
+def generar_lectura(dev_index: int) -> dict[str, Any]:
     """Genera una lectura plausible, con excursiones ocasionales fuera de rango."""
     base_t = 21.0
     base_h = 50.0
@@ -57,7 +57,7 @@ def main() -> None:
     parser.add_argument(
         "--url",
         default="http://127.0.0.1:8000/api/lecturas",
-        help="URL del endpoint de recepción (por defecto, el servidor local).",
+        help="URL del endpoint de recepciÃ³n (por defecto, el servidor local).",
     )
     parser.add_argument("--interval", type=float, default=10.0, help="Segundos entre lecturas.")
     parser.add_argument(
@@ -69,7 +69,7 @@ def main() -> None:
     print(f"Simulador ESP32 -> {args.url} (intervalo {args.interval}s)")
     enviados = 0
     while args.count == 0 or enviados < args.count:
-        payload = _generar_lectura(enviados)
+        payload = generar_lectura(enviados)
         codigo, cuerpo = _enviar(args.url, payload, args.api_key)
         marca = datetime.now(UTC).strftime("%H:%M:%S")
         if codigo in (200, 201):

@@ -20,6 +20,10 @@ Vagrant.configure("2") do |config|
   # API: el contenedor publica en el puerto 8080 de la VM y Vagrant lo reenvia
   # al 8080 del host, escuchando en todas las interfaces (para el ESP32).
   config.vm.network "forwarded_port", guest: 8080, host: 8080, host_ip: "0.0.0.0"
+  # Practica 2: broker MQTT, InfluxDB y Grafana.
+  config.vm.network "forwarded_port", guest: 1883, host: 1883, host_ip: "0.0.0.0"
+  config.vm.network "forwarded_port", guest: 3000, host: 3000, host_ip: "0.0.0.0"
+  config.vm.network "forwarded_port", guest: 8086, host: 8086, host_ip: "0.0.0.0"
   # Vagrant ya reenvia el SSH del invitado al puerto 2222 del host por defecto.
 
   # Carpeta compartida con el proyecto. Se usa solo como origen: el provisioner

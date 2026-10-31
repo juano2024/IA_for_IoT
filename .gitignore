@@ -25,6 +25,9 @@ data/
 .coverage
 htmlcov/
 
+# Logs de ejecucion
+*.log
+
 # Editores y SO
 .vscode/
 .idea/

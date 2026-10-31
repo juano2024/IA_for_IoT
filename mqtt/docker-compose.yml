@@ -1,0 +1,157 @@
+# Practica 2 - Broker MQTT + InfluxDB + Grafana
+#
+#   docker compose -f mqtt/docker-compose.yml up -d --build
+#   docker compose -f mqtt/docker-compose.yml logs -f bridge
+#   docker compose -f mqtt/docker-compose.yml down
+#
+# Servicios:
+#   mosquitto : broker MQTT con usuario/contrasena (1883)
+#   influxdb  : base de datos de series de tiempo (8086)
+#   grafana   : dashboards y alertas (3000)
+#   bridge    : se suscribe al broker y escribe en InfluxDB + CSV
+#   notifier  : recibe los webhooks de alerta de Grafana
+
+name: ia-for-iot-mqtt
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: ia_for_iot_mosquitto
+    restart: unless-stopped
+    user: root
+    ports:
+      - "1883:1883"
+    environment:
+      MQTT_USER: "${MQTT_USERNAME:-iot}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD:-iot2026}"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/entrypoint.sh:/mosquitto/entrypoint.sh:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    entrypoint: ["/bin/sh", "/mosquitto/entrypoint.sh"]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mosquitto_pub -h 127.0.0.1 -p 1883 -u "$$MQTT_USER" -P "$$MQTT_PASSWORD" -t healthcheck -m ok
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: ia_for_iot_influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: "${INFLUX_ADMIN_USER:-admin}"
+      DOCKER_INFLUXDB_INIT_PASSWORD: "${INFLUX_ADMIN_PASSWORD:-admin12345}"
+      DOCKER_INFLUXDB_INIT_ORG: "${INFLUX_ORG:-iaforiot}"
+      DOCKER_INFLUXDB_INIT_BUCKET: "${INFLUX_BUCKET:-iot}"
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: "${INFLUX_TOKEN:-ia-for-iot-token}"
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  grafana:
+    image: grafana/grafana-oss:11.6.0
+    container_name: ia_for_iot_grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ALERTING_ENABLED: "true"
+      GF_UNIFIED_ALERTING_ENABLED: "true"
+      # Variables usadas por el provisioning del datasource
+      INFLUX_ORG: "${INFLUX_ORG:-iaforiot}"
+      INFLUX_BUCKET: "${INFLUX_BUCKET:-iot}"
+      INFLUX_TOKEN: "${INFLUX_TOKEN:-ia-for-iot-token}"
+      # Correo opcional (ver README para configurar notificaciones)
+      GF_SMTP_ENABLED: "${GRAFANA_SMTP_ENABLED:-false}"
+      GF_SMTP_HOST: "${GRAFANA_SMTP_HOST:-}"
+      GF_SMTP_USER: "${GRAFANA_SMTP_USER:-}"
+      GF_SMTP_PASSWORD: "${GRAFANA_SMTP_PASSWORD:-}"
+      GF_SMTP_FROM_ADDRESS: "${GRAFANA_SMTP_FROM:-}"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      influxdb:
+        condition: service_healthy
+
+  bridge:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: ia-for-iot:latest
+    container_name: ia_for_iot_bridge
+    restart: unless-stopped
+    command: ["uv", "run", "--no-dev", "--no-sync", "mqtt-bridge"]
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      MQTT_USERNAME: "${MQTT_USERNAME:-iot}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD:-iot2026}"
+      MQTT_TOPIC_PREFIX: "${MQTT_TOPIC_PREFIX:-invernadero1}"
+      MQTT_CLIENT_ID: "ia-for-iot-bridge"
+      MQTT_QOS: "1"
+      INFLUX_URL: "http://influxdb:8086"
+      INFLUX_TOKEN: "${INFLUX_TOKEN:-ia-for-iot-token}"
+      INFLUX_ORG: "${INFLUX_ORG:-iaforiot}"
+      INFLUX_BUCKET: "${INFLUX_BUCKET:-iot}"
+      INFLUX_MEASUREMENT: "${INFLUX_MEASUREMENT:-clima}"
+      CSV_PATH: "/app/data/lecturas.csv"
+      TEMP_MIN: "${TEMP_MIN:-18}"
+      TEMP_MAX: "${TEMP_MAX:-22}"
+      HUM_MIN: "${HUM_MIN:-40}"
+      HUM_MAX: "${HUM_MAX:-60}"
+    volumes:
+      - ../data:/app/data
+    healthcheck:
+      # El bridge no sirve HTTP: el healthcheck del Dockerfile (puerto 8000)
+      # no aplica a este servicio.
+      disable: true
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+
+  notifier:
+    image: python:3.14-slim
+    container_name: ia_for_iot_notifier
+    restart: unless-stopped
+    command: ["python", "/app/notifier.py"]
+    volumes:
+      - ./notifier/notifier.py:/app/notifier.py:ro
+      - ./notifier/data:/app/data
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:
+  influxdb-data:
+  influxdb-config:
+  grafana-data:

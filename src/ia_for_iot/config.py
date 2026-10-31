@@ -3,7 +3,10 @@
 Todos los valores se pueden sobreescribir con variables de entorno:
 
     APP_HOST, APP_PORT, DATABASE_URL, CSV_PATH,
-    TEMP_MIN, TEMP_MAX, HUM_MIN, HUM_MAX, DEVICE_API_KEY
+    TEMP_MIN, TEMP_MAX, HUM_MIN, HUM_MAX, DEVICE_API_KEY,
+    MQTT_HOST, MQTT_PORT, MQTT_USERNAME, MQTT_PASSWORD,
+    MQTT_TOPIC_PREFIX, MQTT_CLIENT_ID, MQTT_QOS, MQTT_PAIR_TTL,
+    INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET, INFLUX_MEASUREMENT
 """
 
 from __future__ import annotations
@@ -42,6 +45,24 @@ class Settings(BaseSettings):
     # --- Seguridad ----------------------------------------------------
     # Si se define, el dispositivo debe enviar la cabecera X-API-Key.
     device_api_key: str = ""
+
+    # --- MQTT (Practica 2) --------------------------------------------
+    mqtt_host: str = "127.0.0.1"
+    mqtt_port: int = 1883
+    mqtt_username: str = ""
+    mqtt_password: str = ""
+    mqtt_topic_prefix: str = "invernadero1"
+    mqtt_client_id: str = "ia-for-iot-bridge"
+    mqtt_qos: int = 1
+    # Tiempo maximo (segundos) para emparejar temperatura y humedad.
+    mqtt_pair_ttl: float = 60.0
+
+    # --- InfluxDB (Practica 2) ----------------------------------------
+    influx_url: str = "http://127.0.0.1:8086"
+    influx_token: str = ""
+    influx_org: str = "iaforiot"
+    influx_bucket: str = "iot"
+    influx_measurement: str = "clima"
 
     def ensure_directories(self) -> None:
         """Crea el directorio del CSV y el de la base de datos si no existen."""

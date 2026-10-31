@@ -1,0 +1,215 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: confort-invernadero
+    folder: IA for IoT
+    interval: 10s
+    rules:
+      - uid: temperatura-alta
+        title: Temperatura alta (mas de 22 C)
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: influxdb-iot
+            model:
+              refId: A
+              datasource:
+                type: influxdb
+                uid: influxdb-iot
+              rawQuery: true
+              resultFormat: time_series
+              query: |
+                from(bucket: "iot")
+                  |> range(start: -5m)
+                  |> filter(fn: (r) => r._measurement == "clima" and r._field == "temperatura_c")
+                  |> last()
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              type: classic_conditions
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [22]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        isPaused: false
+        annotations:
+          summary: La temperatura supera los 22 C
+          description: La temperatura del invernadero esta por encima del rango de confort.
+        labels:
+          severity: critical
+          magnitud: temperatura
+          sentido: alta
+
+      - uid: temperatura-baja
+        title: Temperatura baja (menos de 18 C)
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: influxdb-iot
+            model:
+              refId: A
+              datasource:
+                type: influxdb
+                uid: influxdb-iot
+              rawQuery: true
+              resultFormat: time_series
+              query: |
+                from(bucket: "iot")
+                  |> range(start: -5m)
+                  |> filter(fn: (r) => r._measurement == "clima" and r._field == "temperatura_c")
+                  |> last()
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              type: classic_conditions
+              conditions:
+                - type: query
+                  evaluator:
+                    type: lt
+                    params: [18]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        isPaused: false
+        annotations:
+          summary: La temperatura esta por debajo de los 18 C
+          description: La temperatura del invernadero esta por debajo del rango de confort.
+        labels:
+          severity: critical
+          magnitud: temperatura
+          sentido: baja
+
+      - uid: humedad-alta
+        title: Humedad alta (mas de 60 %)
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: influxdb-iot
+            model:
+              refId: A
+              datasource:
+                type: influxdb
+                uid: influxdb-iot
+              rawQuery: true
+              resultFormat: time_series
+              query: |
+                from(bucket: "iot")
+                  |> range(start: -5m)
+                  |> filter(fn: (r) => r._measurement == "clima" and r._field == "humedad_pct")
+                  |> last()
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              type: classic_conditions
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [60]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        isPaused: false
+        annotations:
+          summary: La humedad supera el 60 %
+          description: La humedad relativa del invernadero esta por encima del rango de confort.
+        labels:
+          severity: warning
+          magnitud: humedad
+          sentido: alta
+
+      - uid: humedad-baja
+        title: Humedad baja (menos de 40 %)
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: influxdb-iot
+            model:
+              refId: A
+              datasource:
+                type: influxdb
+                uid: influxdb-iot
+              rawQuery: true
+              resultFormat: time_series
+              query: |
+                from(bucket: "iot")
+                  |> range(start: -5m)
+                  |> filter(fn: (r) => r._measurement == "clima" and r._field == "humedad_pct")
+                  |> last()
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              type: classic_conditions
+              conditions:
+                - type: query
+                  evaluator:
+                    type: lt
+                    params: [40]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        isPaused: false
+        annotations:
+          summary: La humedad esta por debajo del 40 %
+          description: La humedad relativa del invernadero esta por debajo del rango de confort.
+        labels:
+          severity: warning
+          magnitud: humedad
+          sentido: baja
