@@ -1,0 +1,35 @@
+# Override para el despliegue de la Practica 2 en Google Cloud.
+#
+#   docker compose -f mqtt/docker-compose.yml -f mqtt/docker-compose.gcp.yml up -d --build
+#
+# Cambios frente al compose base:
+#   - InfluxDB no publica el 8086: solo es accesible en la red interna de
+#     Docker (punto 6 de la guia: la base de datos separada de Internet).
+#   - Las contrasenas y el token no tienen valor por defecto; deben venir de
+#     mqtt/.env (el startup script lo escribe con los metadatos de la VM).
+#   - Grafana sin registro ni acceso anonimo.
+
+services:
+  mosquitto:
+    environment:
+      MQTT_USER: "${MQTT_USERNAME:?Define MQTT_USERNAME en mqtt/.env}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD:?Define MQTT_PASSWORD en mqtt/.env}"
+
+  influxdb:
+    ports: !reset []
+    environment:
+      DOCKER_INFLUXDB_INIT_USERNAME: "${INFLUX_ADMIN_USER:?Define INFLUX_ADMIN_USER en mqtt/.env}"
+      DOCKER_INFLUXDB_INIT_PASSWORD: "${INFLUX_ADMIN_PASSWORD:?Define INFLUX_ADMIN_PASSWORD en mqtt/.env}"
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: "${INFLUX_TOKEN:?Define INFLUX_TOKEN en mqtt/.env}"
+
+  grafana:
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?Define GRAFANA_ADMIN_PASSWORD en mqtt/.env}"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      INFLUX_TOKEN: "${INFLUX_TOKEN:?Define INFLUX_TOKEN en mqtt/.env}"
+
+  bridge:
+    environment:
+      MQTT_USERNAME: "${MQTT_USERNAME:?Define MQTT_USERNAME en mqtt/.env}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD:?Define MQTT_PASSWORD en mqtt/.env}"
+      INFLUX_TOKEN: "${INFLUX_TOKEN:?Define INFLUX_TOKEN en mqtt/.env}"

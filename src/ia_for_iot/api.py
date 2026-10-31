@@ -33,6 +33,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # Los recursos compartidos se crean una sola vez al arrancar la API y
+        # se liberan al apagarla. Así cada petición puede reutilizar el motor.
         configuracion.ensure_directories()
         engine = build_engine(configuracion.database_url)
         app.state.settings = configuracion
@@ -57,6 +59,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def comprobar_api_key(request: Request, x_api_key: ClaveApi = None) -> None:
         """Valida la cabecera X-API-Key cuando el servidor la exige."""
+        # La autenticación es opcional: solo se activa si DEVICE_API_KEY está
+        # definida. compare_digest evita comparaciones vulnerables a timing.
         clave = request.app.state.settings.device_api_key
         if not clave:
             return
@@ -72,6 +76,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def panel() -> HTMLResponse:
         """Dashboard HTML con la evolucion de temperatura y humedad."""
+        # El panel es un recurso estático servido por la misma API; no necesita
+        # una ruta adicional ni un servidor web separado.
         if not DASHBOARD_HTML.is_file():
             raise HTTPException(status_code=404, detail="Dashboard no disponible")
         return HTMLResponse(DASHBOARD_HTML.read_text(encoding="utf-8"))
@@ -88,6 +94,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     def crear_lectura(payload: LecturaCreate, request: Request, db: Sesion) -> LecturaOut:
         """Recibe la medicion, la evalua y la guarda en la BD y en el CSV."""
+        # FastAPI valida payload y crea db antes de entrar aquí; registrar()
+        # concentra la clasificación y la persistencia en ambos soportes.
         configuracion: Settings = request.app.state.settings
         return registrar(db, payload, configuracion)
 
@@ -102,6 +110,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dispositivo: str | None = Query(default=None),
     ) -> list[LecturaOut]:
         """Devuelve las lecturas mas recientes, de la mas nueva a la mas antigua."""
+        # El límite protege la respuesta y el filtro permite consultar un
+        # dispositivo concreto sin duplicar otra ruta de API.
         return listar(db, limite=limite, dispositivo=dispositivo)
 
     @app.get(
@@ -127,12 +137,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ventana: int = Query(default=100, ge=1, le=1000),
     ) -> EstadisticasOut:
         """Minimo, maximo, promedio y porcentaje de tiempo fuera de rango."""
+        # Las estadísticas usan los mismos umbrales configurados que se
+        # aplican al registrar nuevas lecturas.
         configuracion: Settings = request.app.state.settings
         return estadisticas(db, ventana=ventana, settings=configuracion)
 
     @app.get("/api/lecturas.csv", summary="Descarga el archivo CSV con las lecturas")
     def descargar_csv(request: Request) -> FileResponse:
         """Entrega el CSV generado por el servidor."""
+        # Se comprueba la existencia para devolver un error explícito cuando
+        # todavía no se ha recibido ninguna lectura.
         ruta: Path = request.app.state.settings.csv_path
         if not ruta.is_file():
             raise HTTPException(status_code=404, detail="Todavia no hay datos en el CSV")
@@ -143,6 +157,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/health", response_model=SaludOut, summary="Estado del servicio")
     def salud(request: Request, db: Sesion) -> SaludOut:
         """Comprueba la conexion con la base de datos y resume el estado."""
+        # Este endpoint está pensado para supervisión: informa del servicio
+        # aunque la consulta de conteo falle, marcándolo como degradado.
         try:
             total = total_lecturas(db)
             bd = "ok"

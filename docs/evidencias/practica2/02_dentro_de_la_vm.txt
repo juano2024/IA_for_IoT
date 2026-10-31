@@ -1,0 +1,60 @@
+# Evidencias dentro de la VM iot-p2-vm - 2026-10-31T12:48:07Z
+
+## Maquina
+2 vCPU; Ubuntu 22.04.5 LTS
+               total        used        free      shared  buff/cache   available
+Mem:             958         421         127           0         409         376
+Swap:           2047         207        1840
+
+## Rama desplegada
+practica-2-mqtt @ 5638453 fix(gcp): tratar el progreso de gcloud en stderr como texto en PowerShell 5.1
+
+## Contenedores
+NAME                   STATUS                   PORTS
+ia_for_iot_bridge      Up 5 minutes             8000/tcp
+ia_for_iot_grafana     Up 5 minutes             0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+ia_for_iot_influxdb    Up 6 minutes (healthy)   8086/tcp
+ia_for_iot_mosquitto   Up 6 minutes (healthy)   0.0.0.0:1883->1883/tcp, [::]:1883->1883/tcp
+ia_for_iot_notifier    Up 6 minutes (healthy)   8080/tcp
+
+## Memoria por contenedor
+NAME                   MEM USAGE / LIMIT     CPU %
+ia_for_iot_grafana     93.15MiB / 958.3MiB   0.26%
+ia_for_iot_bridge      31.44MiB / 958.3MiB   0.02%
+ia_for_iot_notifier    12.52MiB / 958.3MiB   0.02%
+ia_for_iot_mosquitto   1.297MiB / 958.3MiB   0.05%
+ia_for_iot_influxdb    54.47MiB / 958.3MiB   1.19%
+
+## CSV
+9 data/lecturas.csv
+2026-10-31T12:45:22.023687Z,esp32-dht11,33.00,50.00,ALERTA,true
+2026-10-31T12:45:56.168732Z,esp32-dht11,24.00,70.00,OK,false
+2026-10-31T12:45:58.171646Z,esp32-dht11,24.00,70.00,OK,false
+2026-10-31T12:46:00.172615Z,esp32-dht11,24.00,70.00,OK,false
+
+## InfluxDB: lecturas por estado (ultima hora)
+Table: keys: [_start, _stop, estado]
+                   _start:time                      _stop:time           estado:string                  _value:int
+2026-10-31T11:48:15.748324090Z  2026-10-31T12:48:15.748324090Z                  ALERTA                           3
+Table: keys: [_start, _stop, estado]
+                   _start:time                      _stop:time           estado:string                  _value:int
+2026-10-31T11:48:15.748324090Z  2026-10-31T12:48:15.748324090Z                      OK                           6
+
+## Notificador
+2026-10-31T12:45:25.992092+00:00 [firing] [FIRING:1] Temperatura alta (mas de 30 C) IA for IoT (temperatura alta critical)
+2026-10-31T12:45:27.549776+00:00 [firing] [FIRING:1] Humedad baja (menos de 60 %) IA for IoT (humedad baja warning)
+2026-10-31T12:46:25.281656+00:00 [resolved] [RESOLVED] Temperatura alta (mas de 30 C) IA for IoT (temperatura alta critical)
+2026-10-31T12:46:27.549201+00:00 [resolved] [RESOLVED] Humedad baja (menos de 60 %) IA for IoT (humedad baja warning)
+
+## Puente (ultimas lecturas)
+2026-10-31 12:45:22,030 INFO ia_for_iot.mqtt_bridge: Lectura esp32-dht11: 33.00 C / 50.00 % -> ALERTA
+2026-10-31 12:45:56,174 INFO ia_for_iot.mqtt_bridge: Lectura esp32-dht11: 24.00 C / 70.00 % -> OK
+2026-10-31 12:45:58,178 INFO ia_for_iot.mqtt_bridge: Lectura esp32-dht11: 24.00 C / 70.00 % -> OK
+2026-10-31 12:46:00,181 INFO ia_for_iot.mqtt_bridge: Lectura esp32-dht11: 24.00 C / 70.00 % -> OK
+
+## Log de arranque
+=== [Sat Oct 31 12:24:47 UTC 2026] Arranque de la Practica 2 ===
+=== Instalando Docker ===
+=== Clonando la rama practica-2-mqtt ===
+=== Levantando el stack MQTT ===
+=== Stack listo: Grafana responde en el puerto 3000 ===

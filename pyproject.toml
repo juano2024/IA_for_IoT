@@ -12,11 +12,15 @@ dependencies = [
     "uvicorn[standard]>=0.54.0",
     "sqlalchemy>=2.1.6",
     "pydantic-settings>=2.16.1",
+    "paho-mqtt>=2.1.0",
+    "influxdb-client>=1.50.0",
 ]
 
 [project.scripts]
 ia-for-iot = "ia_for_iot:main"
 simular-esp32 = "ia_for_iot.simulador:main"
+simular-esp32-mqtt = "ia_for_iot.publicador_mqtt:main"
+mqtt-bridge = "ia_for_iot.mqtt_bridge:main"
 
 [dependency-groups]
 dev = [
