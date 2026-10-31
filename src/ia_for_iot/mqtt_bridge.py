@@ -124,7 +124,10 @@ def procesar_lectura(
     write_api: Any | None = None,
     momento: datetime | None = None,
 ) -> dict[str, Any]:
-    """Evalua, guarda en InfluxDB y agrega la fila al CSV.
+    """Evalua, agrega la fila al CSV y guarda el punto en InfluxDB.
+
+    El CSV se escribe primero: si InfluxDB tarda o falla, la lectura queda
+    registrada igual y la excepcion se propaga para que se registre en el log.
 
     ``write_api`` se inyecta para poder probar sin una instancia real de
     InfluxDB (se pasa ``None`` para escribir solo el CSV).
@@ -132,10 +135,6 @@ def procesar_lectura(
     estado, alerta, motivo = evaluar(lectura["temperatura_c"], lectura["humedad_pct"], settings)
     instante = momento or datetime.now(UTC)
     dispositivo = str(lectura.get("dispositivo", "esp32-dht11"))
-
-    if write_api is not None:
-        punto = construir_punto(lectura, settings, instante)
-        write_api.write(bucket=settings.influx_bucket, record=punto)
 
     append_csv(
         settings.csv_path,
@@ -148,6 +147,10 @@ def procesar_lectura(
             "alerta": alerta,
         },
     )
+
+    if write_api is not None:
+        punto = construir_punto(lectura, settings, instante)
+        write_api.write(bucket=settings.influx_bucket, record=punto)
 
     LOGGER.info(
         "Lectura %s: %.2f C / %.2f %% -> %s",
@@ -177,7 +180,8 @@ def _crear_write_api(settings: Settings) -> tuple[InfluxDBClient | None, Any | N
         url=settings.influx_url,
         token=settings.influx_token,
         org=settings.influx_org,
-        timeout=10_000,
+        # En una VM pequena (e2-micro) la primera escritura supero los 10 s.
+        timeout=30_000,
     )
     LOGGER.info(
         "InfluxDB configurado en %s (org=%s, bucket=%s)",

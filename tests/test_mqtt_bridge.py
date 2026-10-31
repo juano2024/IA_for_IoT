@@ -120,3 +120,19 @@ def test_procesar_lectura_envia_a_influx(settings: Settings) -> None:
     bucket, punto = falso.registros[0]
     assert bucket == settings.influx_bucket
     assert "alerta=1i" in punto.to_line_protocol()
+
+
+def test_procesar_lectura_guarda_csv_aunque_falle_influx(settings: Settings) -> None:
+    class WriteApiLento:
+        def write(self, bucket: str, record: Any) -> None:
+            raise TimeoutError("timed out")
+
+    with pytest.raises(TimeoutError):
+        procesar_lectura(
+            {"temperatura_c": 20.0, "humedad_pct": 50.0},
+            settings,
+            write_api=WriteApiLento(),
+        )
+    with settings.csv_path.open(encoding="utf-8", newline="") as archivo:
+        filas = list(csv.DictReader(archivo))
+    assert len(filas) == 1

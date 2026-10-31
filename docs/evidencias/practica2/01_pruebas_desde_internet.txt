@@ -1,0 +1,38 @@
+# Evidencias desde Internet contra la VM de GCP (136.113.16.29) - 2026-10-31T12:44:29Z
+
+## 1. Lecturas normales (24 C / 70 %)
+[1] invernadero1/temperatura=24.00 invernadero1/humedad=70.00
+[2] invernadero1/temperatura=24.00 invernadero1/humedad=70.00
+[3] invernadero1/temperatura=24.00 invernadero1/humedad=70.00
+Simulador finalizado: 3 lecturas publicadas.
+
+## 2. Conexion sin clave
+No se pudo autenticar con el broker (Not authorized). Usa --user y --password.
+
+## 3. Conexion con clave errada
+No se pudo autenticar con el broker (Not authorized). Usa --user y --password.
+
+## 4. Puertos desde Internet
+puerto 1883: abierto
+puerto 3000: abierto
+puerto 8086: cerrado
+puerto 22: cerrado
+
+## 5. Lecturas fuera de rango (33 C / 50 %)
+Simulador finalizado: 3 lecturas publicadas.
+
+## 6. Estado de las alertas 30 s despues
+Temperatura alta (mas de 30 C) -> firing
+Temperatura baja (menos de 15 C) -> inactive
+Humedad alta (mas de 80 %) -> inactive
+Humedad baja (menos de 60 %) -> firing
+
+## 7. Lecturas normales de nuevo
+Simulador finalizado: 3 lecturas publicadas.
+Temperatura alta (mas de 30 C) -> inactive
+Temperatura baja (menos de 15 C) -> inactive
+Humedad alta (mas de 80 %) -> inactive
+Humedad baja (menos de 60 %) -> inactive
+
+## 8. Grafana sin credenciales
+HTTP 401

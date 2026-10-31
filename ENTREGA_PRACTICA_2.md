@@ -274,7 +274,7 @@ canal privado.
 ## 7. Pruebas y calidad
 
 ```bash
-uv run pytest -q          # 21 aprobadas (11 API + 10 bridge)
+uv run pytest -q          # 22 aprobadas (11 API + 11 bridge)
 uv run ruff check .       # sin errores
 arduino-cli compile ...   # firmware MQTT compila
 ```
@@ -282,7 +282,7 @@ arduino-cli compile ...   # firmware MQTT compila
 | Prueba | Resultado |
 |---|---|
 | API de la Práctica 1 | 11/11 |
-| Puente MQTT (interpretación, emparejamiento, punto Influx, CSV) | 10/10 |
+| Puente MQTT (interpretación, emparejamiento, punto Influx, CSV, falla de Influx) | 11/11 |
 | Dashboard (5 paneles) | 5/5 consultas válidas |
 | Alertas (4 reglas) | `firing` con 12 °C / 85 %, `resolved` al normalizar (unos 30 s) |
 | Notificador | Recibe webhook y escribe `notificaciones.log` |
@@ -471,3 +471,39 @@ deploy/gcp_mqtt_startup.sh              # Startup script de la VM en GCP
   credenciales SMTP del proveedor.
 - Para producción: TLS en MQTT/Grafana, alta disponibilidad de InfluxDB y
   retención por capas (downsampling).
+
+---
+
+## 11. Evidencias en Google Cloud
+
+Despliegue del 31 de octubre de 2026 en el proyecto `ia-iot-p2-uao-1031`,
+VM `iot-p2-vm` (`e2-micro`, `us-central1-a`), IP `136.113.16.29`, rama
+`practica-2-mqtt`. Salidas completas en
+[`docs/evidencias/practica2/`](docs/evidencias/practica2/).
+
+| Comprobación | Resultado | Archivo |
+|---|---|---|
+| El startup script deja el stack listo | Docker instalado, rama clonada y Grafana respondiendo unos 15 min después de crear la VM | `02_dentro_de_la_vm.txt` |
+| Los cinco contenedores en marcha | `mosquitto`, `influxdb` y `notifier` *healthy*; `grafana` y `bridge` arriba | `02_dentro_de_la_vm.txt` |
+| Memoria en la `e2-micro` | Unos 190 MB en contenedores; 421 MB usados de 958 MB y 207 MB de intercambio | `02_dentro_de_la_vm.txt` |
+| Publicar desde Internet con clave | Lecturas recibidas por el puente | `01_pruebas_desde_internet.txt` |
+| Publicar sin clave o con clave errada | Rechazado: `Not authorized` | `01_pruebas_desde_internet.txt` |
+| Puertos desde Internet | 1883 y 3000 abiertos; **8086 y 22 cerrados** | `01_pruebas_desde_internet.txt` |
+| Doble persistencia | 9 lecturas publicadas: 9 en InfluxDB (3 ALERTA, 6 OK) y 8 en el CSV* | `02_dentro_de_la_vm.txt` |
+| Alertas con 33 °C / 50 % | «Temperatura alta» y «Humedad baja» en `firing` | ambos |
+| Alertas al normalizar | Las cuatro reglas en `inactive`; el notificador registra `[RESOLVED]` en 1 min | ambos |
+| Grafana sin credenciales | `HTTP 401` | `01_pruebas_desde_internet.txt` |
+
+\* En la `e2-micro`, la primera escritura en InfluxDB tardó más que el tiempo
+de espera del cliente (10 s). InfluxDB guardó el punto, pero el puente lo dio
+por fallido y no escribió esa fila en el CSV. Se corrigió en
+`src/ia_for_iot/mqtt_bridge.py`: el CSV se escribe primero y el tiempo de
+espera pasó a 30 s. La prueba `test_procesar_lectura_guarda_csv_aunque_falle_influx`
+cubre el caso.
+
+Pendiente de completar por el equipo antes de eliminar el proyecto:
+
+- [ ] Capturas de MQTT Explorer conectado a `136.113.16.29:1883` con usuario y clave.
+- [ ] Monitor Serial del ESP32 real publicando al broker de la nube.
+- [ ] Panel de Grafana con datos del ESP32 real y una alerta disparada.
+- [ ] Capturas de la consola de GCP: VM, IP estática y reglas de firewall.
