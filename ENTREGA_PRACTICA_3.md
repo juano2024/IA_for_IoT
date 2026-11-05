@@ -90,6 +90,15 @@ Flujo de datos:
 ### 4.1 Requisitos
 
 - Cuenta de AWS y [AWS CLI v2](https://aws.amazon.com/cli/) configurado (`aws configure`).
+  - **AWS Academy Learner Lab:** inicia el laboratorio (*Start Lab*), copia el bloque
+    «AWS CLI» de *AWS Details* en `~/.aws/credentials` (incluye `aws_session_token`)
+    y usa la región `us-east-1`. Las credenciales caducan al terminar la sesión
+    (unas 4 horas): hay que volver a copiarlas. La plantilla no crea roles IAM
+    (el laboratorio no lo permite) y usa el rol existente `LabRole`
+    (parámetro `ExecutionRoleName`).
+  - Cuenta propia: pasa `ExecutionRoleName` con un rol que permita
+    `dynamodb:PutItem/Query/GetItem`, `iot:Publish` e `iot:DescribeEndpoint`, y
+    que confíe en `iot.amazonaws.com` y `lambda.amazonaws.com`.
 - Arduino CLI o Arduino IDE con las bibliotecas *DHT sensor library*,
   *Adafruit Unified Sensor*, *PubSubClient* y *ArduinoJson*.
 - ESP32, DHT11, resistencia de 10 kΩ y tres relés o LED (ventilador, aire
