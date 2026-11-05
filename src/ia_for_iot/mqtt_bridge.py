@@ -1,7 +1,7 @@
 """Puente MQTT -> InfluxDB + CSV (Practica 2).
 
-Se suscribe a los topicos del dispositivo (``invernadero1/temperatura`` y
-``invernadero1/humedad``), empareja ambas magnitudes de cada ciclo, evalua el
+Se suscribe a los topicos del dispositivo (``cuartobebe/temperatura`` y
+``cuartobebe/humedad``), empareja ambas magnitudes de cada ciclo, evalua el
 confort y guarda la lectura en InfluxDB (base de datos de series de tiempo) y
 en el archivo CSV.
 """

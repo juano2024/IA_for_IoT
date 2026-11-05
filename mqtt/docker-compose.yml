@@ -106,7 +106,7 @@ services:
       MQTT_PORT: "1883"
       MQTT_USERNAME: "${MQTT_USERNAME:-iot}"
       MQTT_PASSWORD: "${MQTT_PASSWORD:-iot2026}"
-      MQTT_TOPIC_PREFIX: "${MQTT_TOPIC_PREFIX:-invernadero1}"
+      MQTT_TOPIC_PREFIX: "${MQTT_TOPIC_PREFIX:-cuartobebe}"
       MQTT_CLIENT_ID: "ia-for-iot-bridge"
       MQTT_QOS: "1"
       INFLUX_URL: "http://influxdb:8086"
@@ -115,10 +115,10 @@ services:
       INFLUX_BUCKET: "${INFLUX_BUCKET:-iot}"
       INFLUX_MEASUREMENT: "${INFLUX_MEASUREMENT:-clima}"
       CSV_PATH: "/app/data/lecturas.csv"
-      TEMP_MIN: "${TEMP_MIN:-15}"
-      TEMP_MAX: "${TEMP_MAX:-30}"
-      HUM_MIN: "${HUM_MIN:-60}"
-      HUM_MAX: "${HUM_MAX:-80}"
+      TEMP_MIN: "${TEMP_MIN:-18}"
+      TEMP_MAX: "${TEMP_MAX:-22}"
+      HUM_MIN: "${HUM_MIN:-40}"
+      HUM_MAX: "${HUM_MAX:-60}"
     volumes:
       - ../data:/app/data
     healthcheck:

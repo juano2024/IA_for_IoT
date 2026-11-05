@@ -2,8 +2,8 @@
  * IA for IoT - Practica 2
  * ESP32 + DHT11 -> broker MQTT -> puente -> InfluxDB + CSV -> Grafana
  *
- * Caso de uso: condiciones optimas del cultivo de tomate en invernadero
- *              (15-30 C y 60-80 % de humedad relativa).
+ * Caso de uso: monitoreo del cuarto de un bebe
+ *              (confort: 18-22 C y 40-60 % de humedad relativa).
  *
  * CABLEADO
  *   DHT11 VCC   -> 3.3V del ESP32
@@ -58,7 +58,7 @@ DHT dht(DHTPIN, DHTTYPE);
 // 3. PARAMETROS DE ENVIO
 // ------------------------------------------------------------------
 #define DEVICE_ID      "esp32-dht11"
-#define TOPIC_PREFIX   "invernadero1"
+#define TOPIC_PREFIX   "cuartobebe"
 #define SEND_INTERVAL  10000   // 10 segundos entre lecturas
 #define LED_PIN        2       // LED integrado de la placa (indica actividad)
 

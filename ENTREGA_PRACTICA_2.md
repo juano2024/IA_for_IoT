@@ -7,10 +7,9 @@
 
 ## 1. Alcance de esta entrega
 
-**Caso de uso:** condiciones del cultivo de tomate en invernadero. El rango
-óptimo es de 15–30 °C y 60–80 % de humedad relativa; por debajo de 12–15 °C y
-por encima de 30–35 °C hay problemas de desarrollo y fructificación (fuente:
-Infoagro, [*El cultivo del tomate*](https://www.infoagro.com/documentos/el_cultivo_del_tomate__parte_i_.asp)).
+**Caso de uso:** monitoreo del cuarto de un bebé, el mismo de la Práctica 1. El
+rango de confort es de 18–22 °C y 40–60 % de humedad relativa; fuera de él se
+considera `ALERTA`.
 
 | Punto de la guía | Estado | Dónde se implementa |
 |---|---|---|
@@ -33,7 +32,7 @@ Cloud (sección 8), con la aprobación del profesor.
 
 ```mermaid
 flowchart LR
-    ESP32["ESP32 + DHT11<br/>(o simulador)"] -->|"MQTT QoS 1, usuario y clave<br/>invernadero1/temperatura<br/>invernadero1/humedad"| FW
+    ESP32["ESP32 + DHT11<br/>(o simulador)"] -->|"MQTT QoS 1, usuario y clave<br/>cuartobebe/temperatura<br/>cuartobebe/humedad"| FW
     USER["Navegador"] -->|"HTTP :3000"| FW
     subgraph GCP["Google Cloud: proyecto ia-iot-p2"]
         FW{{"Firewall de la VPC<br/>abre 1883 y 3000<br/>8086 cerrado"}}
@@ -75,11 +74,11 @@ alcanzan por la red interna de Docker. Así se cumple el punto 6 de la guía
 
 ### 3.1 Flujo
 
-1. El ESP32 (o el simulador) publica `invernadero1/temperatura` y
-   `invernadero1/humedad` con QoS 1.
-2. `mqtt_bridge.py` se suscribe a `invernadero1/#`, empareja ambas magnitudes
+1. El ESP32 (o el simulador) publica `cuartobebe/temperatura` y
+   `cuartobebe/humedad` con QoS 1.
+2. `mqtt_bridge.py` se suscribe a `cuartobebe/#`, empareja ambas magnitudes
    dentro de una ventana de 60 s (`MQTT_PAIR_TTL`) y descarta pares incompletos.
-3. Evalúa los umbrales con `service.evaluar()` (15–30 °C, 60–80 %).
+3. Evalúa los umbrales con `service.evaluar()` (18–22 °C, 40–60 %).
 4. Escribe el punto en **InfluxDB** y la fila en **CSV** (doble persistencia).
 
 ### 3.2 Esquema en InfluxDB
@@ -138,7 +137,7 @@ Los 16 puntos de InfluxDB coinciden con las 16 filas del CSV (más la cabecera).
 Al arrancar, Grafana carga desde `mqtt/grafana/provisioning/`:
 
 - **Datasource** `InfluxDB IoT` (Flux, uid `influxdb-iot`, token de InfluxDB).
-- **Dashboard** `IA for IoT - Confort del invernadero` (uid `ia-iot-confort`).
+- **Dashboard** `IA for IoT - Confort del cuarto del bebe` (uid `ia-iot-confort`).
 - **Reglas de alerta** en la carpeta `IA for IoT`.
 - **Punto de contacto** `Webhook notificador` y su política de notificación.
 
@@ -149,8 +148,8 @@ Al arrancar, Grafana carga desde `mqtt/grafana/provisioning/`:
 | Temperatura actual | Stat | Último `temperatura_c` de la última hora |
 | Humedad actual | Stat | Último `humedad_pct` de la última hora |
 | Estado de confort | Stat | Último `estado` (OK/ALERTA) |
-| Temperatura con banda 15–30 °C | Time series | Media por ventana + umbrales |
-| Humedad con banda 60–80 % | Time series | Media por ventana + umbrales |
+| Temperatura con banda 18–22 °C | Time series | Media por ventana + umbrales |
+| Humedad con banda 40–60 % | Time series | Media por ventana + umbrales |
 
 Los cinco paneles se validaron contra la API de Grafana (`/api/ds/query`):
 cada uno devuelve una sola serie con el último valor publicado.
@@ -159,10 +158,10 @@ cada uno devuelve una sola serie con el último valor publicado.
 
 | Alerta | Condición | Severidad |
 |---|---|---|
-| Temperatura alta | último valor > 30 °C | critical |
-| Temperatura baja | último valor < 15 °C | critical |
-| Humedad alta | último valor > 80 % | warning |
-| Humedad baja | último valor < 60 % | warning |
+| Temperatura alta | último valor > 22 °C | critical |
+| Temperatura baja | último valor < 18 °C | critical |
+| Humedad alta | último valor > 60 % | warning |
+| Humedad baja | último valor < 40 % | warning |
 
 Cada regla evalúa la consulta Flux cada 10 s, reduce con `last()` y compara con
 el umbral. Se usa `classic_conditions` porque la expresión `threshold` no reduce
@@ -189,6 +188,12 @@ También se puede configurar correo electrónico definiendo `GRAFANA_SMTP_*` en
 validación para no requerir credenciales SMTP).
 
 ### 4.5 Evidencia de alertas
+
+> **Nota:** esta evidencia se capturó antes de pasar el caso de uso al cuarto del
+> bebé, con los umbrales anteriores (15–30 °C y 60–80 %) y los topics
+> `invernadero1/...`. Con los umbrales actuales (18–22 °C y 40–60 %) las
+> lecturas normales son, por ejemplo, 20 °C y 50 %. Hay que repetir la prueba para
+> actualizar la evidencia.
 
 Validación con Docker Desktop y el override de GCP (31 de octubre de 2026).
 Lecturas forzadas a 12 °C y 85 %, y luego normales a 24 °C y 70 %:
@@ -253,7 +258,7 @@ uv run simular-esp32-mqtt --host 127.0.0.1 --user iot --password iot2026 --count
 
 `firmware/esp32_dht11_mqtt/esp32_dht11_mqtt.ino`:
 
-- Publica cada 10 s en `invernadero1/temperatura` y `invernadero1/humedad`.
+- Publica cada 10 s en `cuartobebe/temperatura` y `cuartobebe/humedad`.
 - Reconecta Wi-Fi y MQTT automáticamente.
 - Usa PubSubClient 2.8.0 y DHT sensor library 1.4.7.
 - Compilación verificada: **68 % de flash** y **14 % de RAM**.
@@ -475,6 +480,11 @@ deploy/gcp_mqtt_startup.sh              # Startup script de la VM en GCP
 ---
 
 ## 11. Evidencias en Google Cloud
+
+> **Nota:** las salidas guardadas en `docs/evidencias/practica2/` son registros
+> históricos de ese despliegue y conservan los topics `invernadero1/...` y los
+> umbrales del caso anterior. No se modificaron para no alterar la evidencia; al
+> repetir el despliegue con el cuarto del bebé deben regenerarse.
 
 Despliegue del 31 de octubre de 2026 en el proyecto `ia-iot-p2-uao-1031`,
 VM `iot-p2-vm` (`e2-micro`, `us-central1-a`), IP `136.113.16.29`, rama

@@ -29,31 +29,31 @@ def settings(tmp_path: Path) -> Settings:
 
 
 def test_interpreta_topico_de_temperatura() -> None:
-    assert interpretar_mensaje("invernadero1/temperatura", b"21.40", "invernadero1") == (
+    assert interpretar_mensaje("cuartobebe/temperatura", b"21.40", "cuartobebe") == (
         "temperatura",
         21.40,
     )
 
 
 def test_interpreta_topico_de_humedad() -> None:
-    assert interpretar_mensaje("invernadero1/humedad", b"49", "invernadero1") == (
+    assert interpretar_mensaje("cuartobebe/humedad", b"49", "cuartobebe") == (
         "humedad",
         49.0,
     )
 
 
 def test_ignora_topicos_ajenos() -> None:
-    assert interpretar_mensaje("otro/temperatura", b"21", "invernadero1") is None
-    assert interpretar_mensaje("invernadero1/estado", b"online", "invernadero1") is None
+    assert interpretar_mensaje("otro/temperatura", b"21", "cuartobebe") is None
+    assert interpretar_mensaje("cuartobebe/estado", b"online", "cuartobebe") is None
 
 
 def test_rechaza_valor_no_numerico() -> None:
-    assert interpretar_mensaje("invernadero1/temperatura", b"nan?", "invernadero1") is None
+    assert interpretar_mensaje("cuartobebe/temperatura", b"nan?", "cuartobebe") is None
 
 
 def test_interpreta_json_completo() -> None:
     payload = b'{"temperatura_c": 21.5, "humedad_pct": 48}'
-    assert interpretar_mensaje("invernadero1/sensores", payload, "invernadero1") == (
+    assert interpretar_mensaje("cuartobebe/sensores", payload, "cuartobebe") == (
         "lectura",
         {"temperatura_c": 21.5, "humedad_pct": 48.0},
     )
@@ -82,7 +82,7 @@ def test_punto_influx_tiene_tags_y_campos(settings: Settings) -> None:
     )
     linea = punto.to_line_protocol()
     assert linea.startswith("clima,")
-    assert "sala=invernadero1" in linea
+    assert "sala=cuartobebe" in linea
     assert "estado=ALERTA" in linea
     assert "temperatura_c=25 " in linea
     assert "humedad_pct=70," in linea
