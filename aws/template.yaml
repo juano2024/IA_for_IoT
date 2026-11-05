@@ -1,0 +1,220 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Practica 3 - Arquitectura serverless para IoT (monitoreo del cuarto de un bebe).
+  ESP32 + DHT11 -> AWS IoT Core (MQTT/TLS) -> DynamoDB -> Lambda + API Gateway
+  -> dashboard estatico en S3.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: ia-iot-p3
+  RulePrefix:
+    Type: String
+    Default: ia_iot_p3
+    AllowedPattern: "[a-zA-Z0-9_]+"
+    Description: Prefijo de las reglas de AWS IoT (solo letras, numeros y guion bajo).
+  WebsiteBucketName:
+    Type: String
+    Description: Nombre global unico del bucket del dashboard (web estatica).
+  ApiToken:
+    Type: String
+    NoEcho: true
+    MinLength: 12
+    Description: Token que el dashboard envia para controlar el actuador.
+  TempMin: {Type: Number, Default: 18}
+  TempMax: {Type: Number, Default: 22}
+  TempAire: {Type: Number, Default: 25, Description: Sobre este valor se sugiere el aire acondicionado en lugar del ventilador.}
+  HumMin: {Type: Number, Default: 40}
+  HumMax: {Type: Number, Default: 60}
+
+Resources:
+  # ---------------------------------------------------------------- DynamoDB
+  LecturasTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-lecturas"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: dispositivo, AttributeType: S}
+        - {AttributeName: ts, AttributeType: N}
+      KeySchema:
+        - {AttributeName: dispositivo, KeyType: HASH}
+        - {AttributeName: ts, KeyType: RANGE}
+
+  EstadoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-actuador"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: dispositivo, AttributeType: S}
+      KeySchema:
+        - {AttributeName: dispositivo, KeyType: HASH}
+
+  # ---------------------------------------------------------------- AWS IoT
+  Thing:
+    Type: AWS::IoT::Thing
+    Properties:
+      ThingName: !Sub "${ProjectName}-esp32"
+
+  DevicePolicy:
+    Type: AWS::IoT::Policy
+    Properties:
+      PolicyName: !Sub "${ProjectName}-device-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: iot:Connect
+            Resource: !Sub "arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:client/esp32-dht11"
+          - Effect: Allow
+            Action: iot:Publish
+            Resource:
+              - !Sub "arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:topic/cuartobebe/telemetria"
+              - !Sub "arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:topic/cuartobebe/estado"
+          - Effect: Allow
+            Action: iot:Subscribe
+            Resource: !Sub "arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/cuartobebe/comandos"
+          - Effect: Allow
+            Action: iot:Receive
+            Resource: !Sub "arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:topic/cuartobebe/comandos"
+
+  IotRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: iot.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: escribir-dynamodb
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: dynamodb:PutItem
+                Resource:
+                  - !GetAtt LecturasTable.Arn
+                  - !GetAtt EstadoTable.Arn
+
+  # Cada mensaje de telemetria se guarda como un item (clave: dispositivo + ts).
+  TelemetriaRule:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      RuleName: !Sub "${RulePrefix}_telemetria"
+      TopicRulePayload:
+        Sql: >-
+          SELECT dispositivo, timestamp() AS ts, temperatura_c, humedad_pct
+          FROM 'cuartobebe/telemetria'
+        AwsIotSqlVersion: "2016-03-23"
+        RuleDisabled: false
+        Actions:
+          - DynamoDBv2:
+              RoleArn: !GetAtt IotRuleRole.Arn
+              PutItem:
+                TableName: !Ref LecturasTable
+
+  # Estado de los actuadores (ventilador, aire, calentador y modo) publicado por el ESP32.
+  EstadoRule:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      RuleName: !Sub "${RulePrefix}_estado"
+      TopicRulePayload:
+        Sql: >-
+          SELECT dispositivo, modo, ventilador, aire, calentador, timestamp() AS ts
+          FROM 'cuartobebe/estado'
+        AwsIotSqlVersion: "2016-03-23"
+        RuleDisabled: false
+        Actions:
+          - DynamoDBv2:
+              RoleArn: !GetAtt IotRuleRole.Arn
+              PutItem:
+                TableName: !Ref EstadoTable
+
+  # ---------------------------------------------------------------- Lambda + API
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-api"
+      CodeUri: lambda/
+      Handler: api.handler
+      Runtime: python3.12
+      Timeout: 15
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLA_LECTURAS: !Ref LecturasTable
+          TABLA_ACTUADOR: !Ref EstadoTable
+          API_TOKEN: !Ref ApiToken
+          TEMP_MIN: !Ref TempMin
+          TEMP_MAX: !Ref TempMax
+          TEMP_AIRE: !Ref TempAire
+          HUM_MIN: !Ref HumMin
+          HUM_MAX: !Ref HumMax
+      Policies:
+        - DynamoDBReadPolicy: {TableName: !Ref LecturasTable}
+        - DynamoDBReadPolicy: {TableName: !Ref EstadoTable}
+        - Statement:
+            - Effect: Allow
+              Action: iot:Publish
+              Resource: !Sub "arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:topic/cuartobebe/comandos"
+            - Effect: Allow
+              Action: iot:DescribeEndpoint
+              Resource: "*"
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/{proxy+}
+            Method: ANY
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [content-type, x-api-token]
+
+  # ---------------------------------------------------------------- S3 web estatica
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref WebsiteBucketName
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: LecturaPublica
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${WebsiteBucket.Arn}/*"
+
+Outputs:
+  ApiUrl:
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
+  WebsiteUrl:
+    Value: !GetAtt WebsiteBucket.WebsiteURL
+  ThingName:
+    Value: !Ref Thing
+  PolicyName:
+    Value: !Ref DevicePolicy
+  LecturasTable:
+    Value: !Ref LecturasTable

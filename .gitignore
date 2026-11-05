@@ -18,6 +18,13 @@ data/
 .env.*
 !.env.example
 
+# Practica 3 (AWS): certificados del dispositivo, token y secretos del firmware
+aws/certs/
+aws/.api-token
+firmware/esp32_dht11_aws/secrets.h
+*.pem
+*.key
+
 # Cache de herramientas
 .pytest_cache/
 .ruff_cache/

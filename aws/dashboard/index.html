@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cuarto del bebé IoT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#f5f7fb; --card:#fff; --ink:#1d2433; --muted:#667085; --line:#e1e6ef;
+    --ok:#2e8b57; --bad:#c0392b; --accent:#3b6fd4; --calor:#d9822b; --frio:#2f7fc1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#10141c; --card:#181e29; --ink:#e8edf6; --muted:#93a0b5; --line:#262e3d; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,sans-serif; }
+  header { padding:20px 16px 4px; max-width:1100px; margin:auto; }
+  h1 { margin:0; font-size:1.4rem; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:.9rem; }
+  main { max-width:1100px; margin:auto; padding:16px; display:grid; gap:16px;
+         grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .card h2 { margin:0 0 6px; font-size:.8rem; color:var(--muted); font-weight:600;
+             text-transform:uppercase; letter-spacing:.04em; }
+  .valor { font-size:2.4rem; font-weight:700; line-height:1.1; }
+  .sub { color:var(--muted); font-size:.85rem; }
+  .ancho { grid-column:1/-1; }
+  canvas { max-height:260px; }
+  .estado-ok { color:var(--ok); } .estado-alerta { color:var(--bad); }
+  .acciones { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  button, .btn { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--ink);
+                 padding:8px 14px; border-radius:8px; cursor:pointer; text-decoration:none; display:inline-block; }
+  button.on { background:var(--ok); color:#fff; border-color:var(--ok); }
+  button.off { background:var(--bad); color:#fff; border-color:var(--bad); }
+  button.auto { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:wait; }
+  .act { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+         padding:10px 0; border-bottom:1px solid var(--line); }
+  .act:last-of-type { border-bottom:0; }
+  .act b { display:block; } .act .sub { display:block; }
+  .pill { font-size:.8rem; font-weight:600; padding:2px 10px; border-radius:99px; border:1px solid var(--line); }
+  .pill.ON { background:var(--ok); border-color:var(--ok); color:#fff; }
+  #aviso { min-height:1.3em; font-size:.85rem; color:var(--muted); margin-top:8px; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; }
+  .tabla { overflow-x:auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cuarto del bebé</h1>
+  <p>ESP32 + DHT11 → AWS IoT Core → DynamoDB · confort 18–22 °C y 40–60 % de humedad</p>
+</header>
+<main>
+  <section class="card"><h2>Temperatura</h2><div class="valor" id="temp">--</div><div class="sub" id="tempSub">&nbsp;</div></section>
+  <section class="card"><h2>Humedad</h2><div class="valor" id="hum">--</div><div class="sub" id="humSub">&nbsp;</div></section>
+  <section class="card"><h2>Estado de confort</h2><div class="valor" id="estado">--</div><div class="sub" id="ultima">Sin datos</div></section>
+  <section class="card">
+    <h2>Acción recomendada</h2>
+    <div class="valor" id="sugerido" style="font-size:1.6rem">--</div>
+    <div class="sub">Según la temperatura: ventilador (&gt;22 °C), aire (&gt;25 °C), calentador (&lt;18 °C)</div>
+  </section>
+
+  <section class="card ancho">
+    <h2>Climatización · modo <span id="modo" class="pill">--</span></h2>
+    <div id="lista"></div>
+    <div class="acciones"><button class="auto" id="btnAuto">Volver a automático</button></div>
+    <div id="aviso"></div>
+  </section>
+
+  <section class="card ancho"><h2>Temperatura (°C)</h2><canvas id="gTemp"></canvas></section>
+  <section class="card ancho"><h2>Humedad (%)</h2><canvas id="gHum"></canvas></section>
+  <section class="card ancho">
+    <h2>Últimas lecturas</h2>
+    <div class="acciones" style="margin:0 0 10px"><a class="btn" id="csv" href="#" download>Descargar CSV</a></div>
+    <div class="tabla"><table><thead><tr><th>Hora</th><th>Temp (°C)</th><th>Hum (%)</th><th>Estado</th><th>Recomendado</th></tr></thead><tbody id="filas"></tbody></table></div>
+  </section>
+</main>
+<script src="config.js"></script>
+<script>
+const C = window.APP_CONFIG;
+const $ = (id) => document.getElementById(id);
+const ACTUADORES = [
+  { id: "ventilador", nombre: "Ventilador", detalle: "Poco calor: sobre 22 °C hasta 25 °C" },
+  { id: "aire", nombre: "Aire acondicionado", detalle: "Mucho calor: sobre 25 °C" },
+  { id: "calentador", nombre: "Calentador", detalle: "Frío: bajo 18 °C" },
+];
+const NOMBRE = { ventilador: "Ventilador", aire: "Aire acondicionado", calentador: "Calentador", ninguno: "Ninguna (confort)" };
+let estadoActual = {};
+
+$("csv").href = `${C.apiUrl}/api/lecturas.csv?dispositivo=${C.dispositivo}`;
+$("lista").innerHTML = ACTUADORES.map((a) => `
+  <div class="act">
+    <div><b>${a.nombre}</b><span class="sub">${a.detalle}</span></div>
+    <span class="pill" id="p-${a.id}">--</span>
+    <div class="acciones" style="margin:0">
+      <button class="on" data-a="${a.id}" data-e="ON">Encender</button>
+      <button class="off" data-a="${a.id}" data-e="OFF">Apagar</button>
+    </div>
+  </div>`).join("");
+
+function grafico(canvas, color) {
+  return new Chart($(canvas), {
+    type: "line",
+    data: { labels: [], datasets: [
+      { data: [], borderColor: color, backgroundColor: color + "22", fill: true, tension: .3, pointRadius: 2 },
+      { data: [], borderColor: "#d9822b", borderDash: [6, 4], pointRadius: 0 },
+      { data: [], borderColor: "#d9822b", borderDash: [6, 4], pointRadius: 0 },
+    ]},
+    options: { animation: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { maxTicksLimit: 8 } } } },
+  });
+}
+const gT = grafico("gTemp", "#3b6fd4");
+const gH = grafico("gHum", "#2f9fa8");
+
+function pintar(g, etiquetas, valores, [min, max]) {
+  g.data.labels = etiquetas;
+  g.data.datasets[0].data = valores;
+  g.data.datasets[1].data = etiquetas.map(() => min);
+  g.data.datasets[2].data = etiquetas.map(() => max);
+  g.update();
+}
+
+async function api(ruta, opciones) {
+  const r = await fetch(C.apiUrl + ruta, opciones);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+  return r.json();
+}
+
+function pintarActuadores(a) {
+  estadoActual = a;
+  $("modo").textContent = a.modo === "AUTO" ? "Automático" : a.modo === "MANUAL" ? "Manual" : "Sin datos";
+  ACTUADORES.forEach(({ id }) => {
+    const p = $("p-" + id);
+    p.textContent = a[id] === "ON" ? "Encendido" : a[id] === "OFF" ? "Apagado" : "--";
+    p.className = "pill " + (a[id] || "");
+  });
+}
+
+async function refrescar() {
+  try {
+    const lecturas = (await api(`/api/lecturas?limite=60&dispositivo=${C.dispositivo}`)).reverse();
+    if (lecturas.length) {
+      const u = lecturas[lecturas.length - 1];
+      $("temp").textContent = u.temperatura_c.toFixed(1) + " °C";
+      $("hum").textContent = u.humedad_pct.toFixed(1) + " %";
+      $("estado").textContent = u.estado;
+      $("estado").className = "valor " + (u.estado === "OK" ? "estado-ok" : "estado-alerta");
+      $("sugerido").textContent = NOMBRE[u.actuador_sugerido] || u.actuador_sugerido;
+      $("ultima").textContent = "Última lectura: " + new Date(u.timestamp).toLocaleString();
+      $("tempSub").textContent = `Confort ${C.rangos.tMin}–${C.rangos.tMax} °C`;
+      $("humSub").textContent = `Confort ${C.rangos.hMin}–${C.rangos.hMax} %`;
+    }
+    const horas = lecturas.map((l) => new Date(l.timestamp).toLocaleTimeString());
+    pintar(gT, horas, lecturas.map((l) => l.temperatura_c), [C.rangos.tMin, C.rangos.tMax]);
+    pintar(gH, horas, lecturas.map((l) => l.humedad_pct), [C.rangos.hMin, C.rangos.hMax]);
+    $("filas").innerHTML = lecturas.slice(-10).reverse().map((l) =>
+      `<tr><td>${new Date(l.timestamp).toLocaleString()}</td><td>${l.temperatura_c.toFixed(1)}</td>` +
+      `<td>${l.humedad_pct.toFixed(1)}</td><td class="${l.estado === "OK" ? "estado-ok" : "estado-alerta"}">${l.estado}</td>` +
+      `<td>${NOMBRE[l.actuador_sugerido] || l.actuador_sugerido}</td></tr>`).join("");
+    pintarActuadores(await api(`/api/actuador?dispositivo=${C.dispositivo}`));
+  } catch (e) {
+    $("aviso").textContent = "No se pudo actualizar: " + e.message;
+  }
+}
+
+async function comando(cuerpo) {
+  const botones = document.querySelectorAll("#lista button, #btnAuto");
+  botones.forEach((b) => (b.disabled = true));
+  $("aviso").textContent = "Enviando comando...";
+  try {
+    await api("/api/actuador", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-token": C.apiToken },
+      body: JSON.stringify(cuerpo),
+    });
+    $("aviso").textContent = "Comando enviado. Esperando confirmación del ESP32...";
+    setTimeout(refrescar, 2500);
+  } catch (e) {
+    $("aviso").textContent = "Error: " + e.message;
+  } finally {
+    botones.forEach((b) => (b.disabled = false));
+  }
+}
+$("lista").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-a]");
+  if (b) comando({ actuador: b.dataset.a, estado: b.dataset.e });
+});
+$("btnAuto").onclick = () => comando({ modo: "AUTO" });
+
+refrescar();
+setInterval(refrescar, C.refrescoMs);
+</script>
+</body>
+</html>
