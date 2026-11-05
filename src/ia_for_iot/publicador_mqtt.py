@@ -3,7 +3,7 @@
 Publica en el broker las mismas magnitudes que el dispositivo real, con
 excursiones ocasionales fuera de rango para poder demostrar las alertas.
 
-    simular-esp32-mqtt --host localhost --prefix invernadero1 --count 20
+    simular-esp32-mqtt --host localhost --prefix cuartobebe --count 20
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=1883, help="Puerto del broker.")
     parser.add_argument("--user", default="", help="Usuario MQTT (opcional).")
     parser.add_argument("--password", default="", help="Contrasena MQTT (opcional).")
-    parser.add_argument("--prefix", default="invernadero1", help="Prefijo de los topicos.")
+    parser.add_argument("--prefix", default="cuartobebe", help="Prefijo de los topicos.")
     parser.add_argument(
         "--count", type=int, default=0, help="Numero de lecturas; 0 significa infinito."
     )

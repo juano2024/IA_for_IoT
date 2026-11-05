@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     mqtt_port: int = 1883
     mqtt_username: str = ""
     mqtt_password: str = ""
-    mqtt_topic_prefix: str = "invernadero1"
+    mqtt_topic_prefix: str = "cuartobebe"
     mqtt_client_id: str = "ia-for-iot-bridge"
     mqtt_qos: int = 1
     # Tiempo maximo (segundos) para emparejar temperatura y humedad.

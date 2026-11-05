@@ -1,6 +1,6 @@
 {
   "uid": "ia-iot-confort",
-  "title": "IA for IoT - Confort del invernadero",
+  "title": "IA for IoT - Confort del cuarto del bebe",
   "tags": ["iot", "mqtt", "influxdb", "practica2"],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -79,11 +79,11 @@
               },
               {
                 "color": "green",
-                "value": 15
+                "value": 18
               },
               {
                 "color": "red",
-                "value": 30
+                "value": 22
               }
             ]
           }
@@ -141,11 +141,11 @@
               },
               {
                 "color": "green",
-                "value": 60
+                "value": 40
               },
               {
                 "color": "red",
-                "value": 80
+                "value": 60
               }
             ]
           }
@@ -227,7 +227,7 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Temperatura (C) con banda optima 15-30",
+      "title": "Temperatura (C) con banda de confort 18-22",
       "gridPos": {
         "x": 0,
         "y": 4,
@@ -280,11 +280,11 @@
               },
               {
                 "color": "green",
-                "value": 15
+                "value": 18
               },
               {
                 "color": "red",
-                "value": 30
+                "value": 22
               }
             ]
           }
@@ -306,7 +306,7 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Humedad (%) con banda optima 60-80",
+      "title": "Humedad (%) con banda de confort 40-60",
       "gridPos": {
         "x": 12,
         "y": 4,
@@ -359,11 +359,11 @@
               },
               {
                 "color": "green",
-                "value": 60
+                "value": 40
               },
               {
                 "color": "red",
-                "value": 80
+                "value": 60
               }
             ]
           }
