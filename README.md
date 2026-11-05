@@ -47,6 +47,7 @@ y despliegue automático en un **servidor Ubuntu**.
 12. [Pruebas y calidad](#12-pruebas-y-calidad)
 13. [Checklist de entrega](#13-checklist-de-entrega)
 14. [Práctica 2: MQTT, InfluxDB y Grafana](#14-práctica-2-mqtt-influxdb-y-grafana)
+15. [Práctica 3: arquitectura serverless en AWS](#15-práctica-3-arquitectura-serverless-en-aws)
 
 ---
 
@@ -891,8 +892,10 @@ IA_for_IoT/
 ├── firmware/
 │   ├── esp32_dht11/
 │   │   └── esp32_dht11.ino       # Sketch HTTP de la Práctica 1
-│   └── esp32_dht11_mqtt/
-│       └── esp32_dht11_mqtt.ino  # Sketch MQTT de la Práctica 2
+│   ├── esp32_dht11_mqtt/
+│   │   └── esp32_dht11_mqtt.ino  # Sketch MQTT de la Práctica 2
+│   └── esp32_dht11_aws/          # Sketch AWS IoT de la Práctica 3
+├── aws/                      # Práctica 3: plantilla, Lambda y dashboard
 ├── mqtt/                     # Stack de la Práctica 2
 │   ├── docker-compose.yml    # Mosquitto + InfluxDB + Grafana + bridge + notifier
 │   ├── mosquitto/            # Configuración y entrypoint con usuario/clave
@@ -1153,9 +1156,58 @@ script genera claves aleatorias en `.env.gcp` (ignorado por git).
 
 ---
 
+## 15. Práctica 3: arquitectura serverless en AWS
+
+El ESP32 envía temperatura y humedad a **AWS IoT Core** por MQTT/TLS; una regla
+las guarda en **DynamoDB**; un dashboard estático en **S3** las muestra, permite
+controlar la climatización y descargar un CSV. Caso de uso: **cuarto de un bebé**
+(confort 18–22 °C y 40–60 % HR). El ESP32 enciende solo el actuador que
+corresponde a la alerta de temperatura:
+
+| Temperatura | Actuador |
+|---|---|
+| > 22 °C y ≤ 25 °C | Ventilador |
+| > 25 °C | Aire acondicionado |
+| < 18 °C | Calentador |
+
+Desde el dashboard también se pueden manejar los tres actuadores en modo manual
+y volver a automático. Documentación completa y paso a paso en
+[`ENTREGA_PRACTICA_3.md`](ENTREGA_PRACTICA_3.md).
+
+```mermaid
+flowchart LR
+    ESP["ESP32 + DHT11"] -->|"MQTT/TLS"| IOT["AWS IoT Core"]
+    IOT -->|"IoT Rule"| DDB[("DynamoDB")]
+    DASH["Dashboard (S3)"] --> API["API Gateway + Lambda"]
+    API --> DDB
+    API -->|"comandos"| IOT
+    IOT -->|"actuador"| ESP
+```
+
+| Qué | Dónde |
+|---|---|
+| Infraestructura (IoT, DynamoDB, Lambda, API, S3) | `aws/template.yaml` |
+| API (lecturas, CSV, actuador) | `aws/lambda/api.py` |
+| Dashboard web estático | `aws/dashboard/` |
+| Firmware ESP32 para AWS IoT | `firmware/esp32_dht11_aws/` (copia `secrets.h.example` a `secrets.h`) |
+| Despliegue y limpieza | `scripts/aws_practica3.ps1` |
+| Pruebas de la Lambda | `tests/test_aws_lambda.py` |
+
+```powershell
+.\scripts\aws_practica3.ps1 -Up -BucketName ia-iot-p3-dashboard-<tu-nombre>   # infraestructura + dashboard
+.\scripts\aws_practica3.ps1 -Certs                                            # certificado del ESP32
+.\scripts\aws_practica3.ps1 -Down -BucketName ia-iot-p3-dashboard-<tu-nombre> # eliminar todo
+```
+
+Los certificados, la clave privada, `secrets.h` y el token de la API no se suben
+a git.
+
+---
+
 ## Créditos
 
 Laboratorio de **IA for IoT**. Enunciado original en `actividad1.txt`
 (versión Adafruit IO); esta implementación sustituye la nube por un servidor
 propio en Ubuntu con FastAPI, SQLite y CSV. La Práctica 2 añade Mosquitto,
-InfluxDB y Grafana para la ruta MQTT.
+InfluxDB y Grafana para la ruta MQTT. La Práctica 3 lleva la solución a AWS
+con IoT Core, DynamoDB, Lambda y S3.
