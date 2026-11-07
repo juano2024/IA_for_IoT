@@ -137,5 +137,9 @@ def test_comando_publica_mensaje_mqtt(
     assert enviados == [("cuartobebe/comandos", mensaje)]
 
 
+def test_consulta_previa_cors_responde_204(api: ModuleType) -> None:
+    assert api.handler(_evento("OPTIONS", "/api/actuador"))["statusCode"] == 204
+
+
 def test_ruta_desconocida_devuelve_404(api: ModuleType) -> None:
     assert api.handler(_evento("GET", "/api/otra"))["statusCode"] == 404

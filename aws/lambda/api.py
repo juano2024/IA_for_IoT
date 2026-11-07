@@ -188,6 +188,11 @@ def handler(evento: dict[str, Any], _contexto: Any = None) -> dict[str, Any]:
     parametros = evento.get("queryStringParameters") or {}
     dispositivo = parametros.get("dispositivo", DISPOSITIVO)
 
+    # La ruta ANY tambien recibe la consulta previa de CORS; API Gateway agrega
+    # las cabeceras, pero el navegador exige una respuesta exitosa.
+    if metodo == "OPTIONS":
+        return {"statusCode": 204, "body": ""}
+
     if metodo == "GET" and ruta.endswith("/api/lecturas"):
         return _json(200, consultar_lecturas(dispositivo, _limite(parametros)))
 
