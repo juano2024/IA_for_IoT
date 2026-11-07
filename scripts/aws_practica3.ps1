@@ -27,6 +27,13 @@ $CertsDir = Join-Path $Aws "certs"
 $TokenFile = Join-Path $Aws ".api-token"   # ignorado por git
 
 function Aws-Cli { & aws @args --region $Region; if ($LASTEXITCODE -ne 0) { throw "aws $($args -join ' ') fallo" } }
+function Test-Aws {
+    # Devuelve $true si el comando termina bien. En PowerShell 5.1 redirigir
+    # stderr con ErrorActionPreference=Stop convierte el aviso en error fatal.
+    $ErrorActionPreference = "Continue"
+    & aws @args --region $Region *> $null
+    return ($LASTEXITCODE -eq 0)
+}
 function Salida($clave) {
     Aws-Cli cloudformation describe-stacks --stack-name $Stack `
         --query "Stacks[0].Outputs[?OutputKey=='$clave'].OutputValue" --output text
@@ -44,8 +51,7 @@ if ($Up) {
     $Artefactos = "$Stack-artefactos-$Cuenta-$Region"
 
     Write-Host "[1/4] Bucket de artefactos $Artefactos"
-    & aws s3api head-bucket --bucket $Artefactos 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    if (-not (Test-Aws s3api head-bucket --bucket $Artefactos)) {
         if ($Region -eq "us-east-1") { Aws-Cli s3api create-bucket --bucket $Artefactos }
         else { Aws-Cli s3api create-bucket --bucket $Artefactos --create-bucket-configuration "LocationConstraint=$Region" }
     }
