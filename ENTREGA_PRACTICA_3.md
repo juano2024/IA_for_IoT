@@ -195,8 +195,9 @@ año; después el costo es de centavos de dólar al mes. Verifica la
 
 ## 8. Limitaciones
 
-- No se ejecutó el despliegue en una cuenta real al escribir este documento:
-  la plantilla y la Lambda se validaron con pruebas locales.
+- La pila se desplegó en AWS Academy Learner Lab (`us-east-1`) y el flujo se
+  probó con el certificado del dispositivo y desde el navegador; falta probarlo
+  con el ESP32 físico y los actuadores.
 - El S3 como web estática usa HTTP; HTTPS requiere CloudFront.
 - El estado de los actuadores es el último confirmado por el ESP32; si el
   dispositivo está desconectado, el comando no se reintenta.
