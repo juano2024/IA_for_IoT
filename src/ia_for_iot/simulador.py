@@ -45,7 +45,7 @@ def entero_no_negativo(texto: str) -> int:
     return valor
 
 
-def _url(texto: str) -> str:
+def url_http(texto: str) -> str:
     """Tipo de argparse: URL http o https con host."""
     partes = urlsplit(texto)
     if partes.scheme not in ("http", "https") or not partes.hostname:
@@ -149,7 +149,7 @@ def crear_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Simulador de lecturas DHT11 (ESP32).")
     parser.add_argument(
         "--url",
-        type=_url,
+        type=url_http,
         default="http://127.0.0.1:8000/api/lecturas",
         help="URL del endpoint de recepcion (por defecto, el servidor local).",
     )

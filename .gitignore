@@ -25,6 +25,14 @@ firmware/esp32_dht11_aws/secrets.h
 *.pem
 *.key
 
+# Actividad 4: secretos del firmware y fotos del dataset
+firmware/esp32_edge_ai/secrets.h
+firmware/esp32cam_vision/secrets.h
+dataset/
+
+# Credenciales copiadas a mano (no deben subirse)
+credentials*.txt
+
 # Cache de herramientas
 .pytest_cache/
 .ruff_cache/

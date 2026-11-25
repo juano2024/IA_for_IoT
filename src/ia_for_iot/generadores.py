@@ -100,9 +100,10 @@ class GeneradorClases:
         clase: str | None = None,
         semilla: int | None = None,
         pesos: tuple[float, ...] | None = None,
+        clases: tuple[str, ...] | None = None,
     ) -> None:
         self.azar = random.Random(semilla)
-        self._clases = CLASES[tipo]
+        self._clases = clases or CLASES[tipo]
         self._pesos = pesos
         self._fija = clase
         self._actual = self._clases[0]
