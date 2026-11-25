@@ -6,7 +6,8 @@ Todos los valores se pueden sobreescribir con variables de entorno:
     TEMP_MIN, TEMP_MAX, HUM_MIN, HUM_MAX, DEVICE_API_KEY,
     MQTT_HOST, MQTT_PORT, MQTT_USERNAME, MQTT_PASSWORD,
     MQTT_TOPIC_PREFIX, MQTT_CLIENT_ID, MQTT_QOS, MQTT_PAIR_TTL,
-    INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET, INFLUX_MEASUREMENT
+    INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET, INFLUX_MEASUREMENT,
+    PREDICCIONES_CSV_PATH, ALERTA_REPETICIONES, ALERTA_CONFIANZA
 """
 
 from __future__ import annotations
@@ -64,9 +65,16 @@ class Settings(BaseSettings):
     influx_bucket: str = "iot"
     influx_measurement: str = "clima"
 
+    # --- Predicciones en el dispositivo (Actividad 4) -----------------
+    predicciones_csv_path: Path = Path("./data/predicciones.csv")
+    # Una alerta se confirma tras N predicciones seguidas con esta confianza.
+    alerta_repeticiones: int = 3
+    alerta_confianza: float = 0.8
+
     def ensure_directories(self) -> None:
         """Crea el directorio del CSV y el de la base de datos si no existen."""
         self.csv_path.parent.mkdir(parents=True, exist_ok=True)
+        self.predicciones_csv_path.parent.mkdir(parents=True, exist_ok=True)
         db_dir = self._sqlite_directory()
         if db_dir is not None:
             db_dir.mkdir(parents=True, exist_ok=True)

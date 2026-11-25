@@ -1,4 +1,4 @@
-"""Persistencia de las lecturas en un archivo CSV."""
+"""Persistencia de las lecturas y predicciones en archivos CSV."""
 
 from __future__ import annotations
 
@@ -16,6 +16,23 @@ CSV_HEADERS = [
     "alerta",
 ]
 
+PREDICCIONES_HEADERS = [
+    "timestamp",
+    "dispositivo",
+    "tipo",
+    "clase",
+    "confianza",
+    "nivel",
+    "temperatura_c",
+    "humedad_pct",
+    "ax",
+    "ay",
+    "az",
+    "gx",
+    "gy",
+    "gz",
+]
+
 
 def _iso(valor: datetime) -> str:
     """Serializa un instante en ISO 8601 con sufijo UTC."""
@@ -24,15 +41,25 @@ def _iso(valor: datetime) -> str:
     return valor.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
-def append_csv(path: Path, registro: dict[str, Any]) -> None:
-    """Agrega una lectura al final del CSV, creando la cabecera si hace falta."""
+def _agregar_fila(path: Path, cabecera: list[str], fila: dict[str, Any]) -> None:
+    """Agrega una fila al final del CSV, creando la cabecera si hace falta."""
     path.parent.mkdir(parents=True, exist_ok=True)
     existe = path.exists() and path.stat().st_size > 0
     with path.open("a", newline="", encoding="utf-8") as archivo:
-        escritor = csv.DictWriter(archivo, fieldnames=CSV_HEADERS)
+        escritor = csv.DictWriter(archivo, fieldnames=cabecera)
         if not existe:
             escritor.writeheader()
-        escritor.writerow(fila_csv(registro))
+        escritor.writerow(fila)
+
+
+def append_csv(path: Path, registro: dict[str, Any]) -> None:
+    """Agrega una lectura al final del CSV de lecturas."""
+    _agregar_fila(path, CSV_HEADERS, fila_csv(registro))
+
+
+def append_prediccion(path: Path, registro: dict[str, Any]) -> None:
+    """Agrega una prediccion al CSV; los campos que no aplican quedan vacios."""
+    _agregar_fila(path, PREDICCIONES_HEADERS, registro)
 
 
 def fila_csv(registro: dict[str, Any]) -> dict[str, str]:

@@ -10,11 +10,13 @@ from typing import Any
 import pytest
 
 from ia_for_iot.config import Settings
+from ia_for_iot.contrato import FiltroAlertas
 from ia_for_iot.mqtt_bridge import (
     Emparejador,
     construir_punto,
     interpretar_mensaje,
     procesar_lectura,
+    procesar_prediccion,
 )
 
 
@@ -24,6 +26,7 @@ def settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url=f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
         csv_path=tmp_path / "lecturas.csv",
+        predicciones_csv_path=tmp_path / "predicciones.csv",
         influx_bucket="iot",
     )
 
@@ -136,3 +139,77 @@ def test_procesar_lectura_guarda_csv_aunque_falle_influx(settings: Settings) -> 
     with settings.csv_path.open(encoding="utf-8", newline="") as archivo:
         filas = list(csv.DictReader(archivo))
     assert len(filas) == 1
+
+
+class _WriteApi:
+    """Guarda los puntos en formato line protocol."""
+
+    def __init__(self, falla: bool = False) -> None:
+        self.lineas: list[str] = []
+        self.falla = falla
+
+    def write(self, bucket: str, record: Any) -> None:
+        if self.falla:
+            raise TimeoutError("timed out")
+        self.lineas.append(record.to_line_protocol())
+
+
+def _filas(ruta: Path) -> list[dict[str, str]]:
+    with ruta.open(encoding="utf-8", newline="") as archivo:
+        return list(csv.DictReader(archivo))
+
+
+def test_interpreta_predicciones_y_descarta_invalidas() -> None:
+    cuerpo = b'{"dispositivo":"esp32-cam","clase":"boca_abajo","confianza":0.91}'
+    assert interpretar_mensaje("cuartobebe/vision", cuerpo, "cuartobebe") == (
+        "vision",
+        {"dispositivo": "esp32-cam", "clase": "boca_abajo", "confianza": 0.91},
+    )
+    invalido = b'{"clase":"otra","confianza":0.9}'
+    assert interpretar_mensaje("cuartobebe/vision", invalido, "cuartobebe") is None
+    assert interpretar_mensaje("otro/vision", cuerpo, "cuartobebe") is None
+
+
+def test_prediccion_se_guarda_con_nivel_confirmado(settings: Settings) -> None:
+    api, filtro = _WriteApi(), FiltroAlertas()
+    prediccion = {"dispositivo": "esp32-cam", "clase": "boca_abajo", "confianza": 0.91}
+    niveles = [procesar_prediccion("vision", prediccion, settings, filtro, api) for _ in range(3)]
+    assert niveles == [0, 0, 2]
+    filas = _filas(settings.predicciones_csv_path)
+    assert [fila["nivel"] for fila in filas] == ["0", "0", "2"]
+    assert filas[0]["tipo"] == "vision"
+    assert filas[0]["temperatura_c"] == ""
+    assert not settings.csv_path.exists()
+    # La clase es campo, no etiqueta: asi no se separan las series.
+    etiquetas, campos = api.lineas[2].split(" ")[:2]
+    assert etiquetas == "prediccion,dispositivo=esp32-cam,sala=cuartobebe,tipo=vision"
+    assert 'clase="boca_abajo"' in campos and "nivel=2i" in campos and "confianza=0.91" in campos
+
+
+def test_clima_tambien_registra_la_lectura(settings: Settings) -> None:
+    api = _WriteApi()
+    prediccion = {
+        "dispositivo": "esp32-cuna",
+        "clase": "riesgo",
+        "confianza": 0.9,
+        "temperatura_c": 27.0,
+        "humedad_pct": 50.0,
+    }
+    procesar_prediccion("clima", prediccion, settings, FiltroAlertas(), api)
+    assert _filas(settings.csv_path)[0]["estado"] == "ALERTA"
+    assert _filas(settings.predicciones_csv_path)[0]["temperatura_c"] == "27.0"
+    assert [linea.split(",")[0] for linea in api.lineas] == ["prediccion", "clima"]
+
+
+def test_prediccion_queda_en_csv_aunque_falle_influx(settings: Settings) -> None:
+    prediccion = {
+        "dispositivo": "esp32-cuna",
+        "clase": "confort",
+        "confianza": 0.9,
+        "temperatura_c": 20.0,
+        "humedad_pct": 50.0,
+    }
+    with pytest.raises(TimeoutError):
+        procesar_prediccion("clima", prediccion, settings, FiltroAlertas(), _WriteApi(falla=True))
+    assert len(_filas(settings.predicciones_csv_path)) == 1
+    assert len(_filas(settings.csv_path)) == 1

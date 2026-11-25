@@ -1,9 +1,13 @@
-"""Puente MQTT -> InfluxDB + CSV (Practica 2).
+"""Puente MQTT -> InfluxDB + CSV (Practica 2 y Actividad 4).
 
 Se suscribe a los topicos del dispositivo (``cuartobebe/temperatura`` y
 ``cuartobebe/humedad``), empareja ambas magnitudes de cada ciclo, evalua el
 confort y guarda la lectura en InfluxDB (base de datos de series de tiempo) y
 en el archivo CSV.
+
+Tambien recibe las predicciones hechas en el dispositivo (``clima``,
+``movimiento`` y ``vision``), confirma su nivel de alerta y las guarda en el
+measurement ``prediccion`` y en ``predicciones.csv``.
 """
 
 from __future__ import annotations
@@ -22,8 +26,9 @@ from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 from .config import Settings, get_settings
+from .contrato import TIPOS, ContratoInvalidoError, FiltroAlertas, decodificar
 from .service import evaluar
-from .storage import append_csv
+from .storage import append_csv, append_prediccion
 
 LOGGER = logging.getLogger("ia_for_iot.mqtt_bridge")
 
@@ -32,6 +37,9 @@ MAGNITUDES = {"temperatura": "temperatura_c", "humedad": "humedad_pct"}
 
 # Topicos que transportan ambas magnitudes en un solo JSON.
 TOPICOS_JSON = {"sensores", "lectura", "json"}
+
+# Measurement de InfluxDB de las predicciones de la Actividad 4.
+MEASUREMENT_PREDICCION = "prediccion"
 
 
 @dataclass
@@ -66,8 +74,9 @@ class Emparejador:
 
 def interpretar_mensaje(
     topico: str, payload: bytes, prefijo: str
-) -> tuple[str, float] | tuple[str, dict[str, float]] | None:
-    """Traduce un mensaje MQTT a ``(magnitud, valor)`` o ``("lectura", datos)``.
+) -> tuple[str, float] | tuple[str, dict[str, Any]] | None:
+    """Traduce un mensaje MQTT a ``(magnitud, valor)``, ``("lectura", datos)`` o
+    ``(tipo, prediccion)`` para los tipos de la Actividad 4.
 
     Devuelve ``None`` si el topico no pertenece al prefijo o el cuerpo no es
     valido.
@@ -95,6 +104,13 @@ def interpretar_mensaje(
             }
         except KeyError, TypeError, ValueError:
             LOGGER.warning("JSON invalido en %s: %r", topico, texto)
+            return None
+
+    if sufijo in TIPOS:
+        try:
+            return sufijo, decodificar(sufijo, payload)
+        except ContratoInvalidoError as error:
+            LOGGER.warning("Prediccion descartada en %s: %s", topico, error)
             return None
 
     return None
@@ -170,6 +186,72 @@ def procesar_lectura(
     }
 
 
+def construir_punto_prediccion(
+    tipo: str, prediccion: dict[str, Any], nivel: int, settings: Settings, momento: datetime
+) -> Point:
+    """Construye el punto de InfluxDB de una prediccion.
+
+    La clase va como campo y no como etiqueta: como etiqueta separaria los
+    datos en una serie por clase y las alertas no verian el cambio.
+    """
+    punto = (
+        Point(MEASUREMENT_PREDICCION)
+        .tag("dispositivo", prediccion["dispositivo"])
+        .tag("sala", settings.mqtt_topic_prefix)
+        .tag("tipo", tipo)
+        .field("clase", prediccion["clase"])
+        .field("nivel", nivel)
+    )
+    for campo, valor in prediccion.items():
+        if campo not in ("dispositivo", "clase"):
+            punto.field(campo, float(valor))
+    return punto.time(momento, WritePrecision.NS)
+
+
+def procesar_prediccion(
+    tipo: str,
+    prediccion: dict[str, Any],
+    settings: Settings,
+    filtro: FiltroAlertas,
+    write_api: Any | None = None,
+    momento: datetime | None = None,
+) -> int:
+    """Confirma el nivel, guarda la prediccion y devuelve ese nivel.
+
+    Un mensaje ``clima`` trae ademas la lectura del DHT11: se registra igual que
+    las de la Practica 2 para que sus paneles y alertas sigan funcionando.
+    """
+    instante = momento or datetime.now(UTC)
+    nivel = filtro.nivel(
+        tipo, prediccion["dispositivo"], prediccion["clase"], prediccion["confianza"]
+    )
+    append_prediccion(
+        settings.predicciones_csv_path,
+        {
+            **prediccion,
+            "timestamp": instante.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+            "tipo": tipo,
+            "nivel": nivel,
+        },
+    )
+    LOGGER.info(
+        "Prediccion %s de %s: %s (confianza %.2f, nivel %s)",
+        tipo,
+        prediccion["dispositivo"],
+        prediccion["clase"],
+        prediccion["confianza"],
+        nivel,
+    )
+    try:
+        if write_api is not None:
+            punto = construir_punto_prediccion(tipo, prediccion, nivel, settings, instante)
+            write_api.write(bucket=settings.influx_bucket, record=punto)
+    finally:
+        if tipo == "clima":
+            procesar_lectura(prediccion, settings, write_api, instante)
+    return nivel
+
+
 def _crear_write_api(settings: Settings) -> tuple[InfluxDBClient | None, Any | None]:
     """Crea el cliente de InfluxDB si hay token configurado."""
     if not settings.influx_token:
@@ -203,6 +285,7 @@ def main() -> None:
 
     cliente_influx, write_api = _crear_write_api(settings)
     emparejador = Emparejador(ttl=settings.mqtt_pair_ttl)
+    filtro = FiltroAlertas(settings.alerta_repeticiones, settings.alerta_confianza)
     detener = threading.Event()
 
     def on_connect(
@@ -241,6 +324,13 @@ def main() -> None:
             return
 
         tipo, valor = resultado
+        if tipo in TIPOS:
+            try:
+                procesar_prediccion(tipo, valor, settings, filtro, write_api)  # type: ignore[arg-type]
+            except Exception:
+                LOGGER.exception("No se pudo registrar la prediccion")
+            return
+
         if tipo == "lectura":
             lectura = dict(valor)  # type: ignore[arg-type]
         else:
