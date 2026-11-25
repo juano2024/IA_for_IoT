@@ -1,0 +1,980 @@
+{
+  "uid": "ia-iot-edge",
+  "title": "IA for IoT - Cuarto del bebe (modelos en el dispositivo)",
+  "tags": [
+    "iot",
+    "mqtt",
+    "influxdb",
+    "actividad4"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "bucket",
+        "label": "Bucket de InfluxDB",
+        "type": "constant",
+        "query": "iot",
+        "current": {
+          "text": "iot",
+          "value": "iot"
+        },
+        "hide": 2
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Ambiente",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"prediccion\" and r.tipo == \"clima\" and r._field == \"clase\") |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"]) |> last()",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^(?!_?[tT]ime$).*$/",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "confort": {
+                  "index": 0,
+                  "text": "Confort",
+                  "color": "green"
+                },
+                "riesgo_leve": {
+                  "index": 1,
+                  "text": "Riesgo leve",
+                  "color": "orange"
+                },
+                "riesgo": {
+                  "index": 2,
+                  "text": "Riesgo",
+                  "color": "red"
+                },
+                "sin_modelo": {
+                  "index": 3,
+                  "text": "Sin modelo",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "noValue": "Sin datos",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Movimiento de la cuna",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"prediccion\" and r.tipo == \"movimiento\" and r._field == \"clase\") |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"]) |> last()",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^(?!_?[tT]ime$).*$/",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "quieto": {
+                  "index": 0,
+                  "text": "Quieto",
+                  "color": "green"
+                },
+                "normal": {
+                  "index": 1,
+                  "text": "Normal",
+                  "color": "green"
+                },
+                "agitacion": {
+                  "index": 2,
+                  "text": "Agitación",
+                  "color": "orange"
+                },
+                "sin_modelo": {
+                  "index": 3,
+                  "text": "Sin modelo",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "noValue": "Sin datos",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Postura del bebé",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"prediccion\" and r.tipo == \"vision\" and r._field == \"clase\") |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"]) |> last()",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^(?!_?[tT]ime$).*$/",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "boca_arriba": {
+                  "index": 0,
+                  "text": "Boca arriba",
+                  "color": "green"
+                },
+                "de_lado": {
+                  "index": 1,
+                  "text": "De lado",
+                  "color": "orange"
+                },
+                "boca_abajo": {
+                  "index": 2,
+                  "text": "Boca abajo",
+                  "color": "red"
+                },
+                "vacia": {
+                  "index": 3,
+                  "text": "Cuna vacía",
+                  "color": "blue"
+                },
+                "sin_modelo": {
+                  "index": 4,
+                  "text": "Sin modelo",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "noValue": "Sin datos",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "gauge",
+      "title": "Confianza: ambiente",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"prediccion\" and r.tipo == \"clima\" and r._field == \"confianza\") |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"]) |> last()",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdMarkers": true,
+        "showThresholdLabels": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 0,
+          "noValue": "Sin datos",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "gauge",
+      "title": "Confianza: movimiento",
+      "gridPos": {
+        "x": 8,
+        "y": 5,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"prediccion\" and r.tipo == \"movimiento\" and r._field == \"confianza\") |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"]) |> last()",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdMarkers": true,
+        "showThresholdLabels": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 0,
+          "noValue": "Sin datos",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "gauge",
+      "title": "Confianza: postura",
+      "gridPos": {
+        "x": 16,
+        "y": 5,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"prediccion\" and r.tipo == \"vision\" and r._field == \"confianza\") |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"]) |> last()",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdMarkers": true,
+        "showThresholdLabels": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 0,
+          "noValue": "Sin datos",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Temperatura",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prediccion\" and r._field == \"temperatura_c\") |> keep(columns: [\"_time\", \"_value\", \"_field\"]) |> group(columns: [\"_field\"]) |> sort(columns: [\"_time\"]) |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "displayName": "${__field.labels._field}"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "temperatura_c"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Temperatura"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Humedad",
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prediccion\" and r._field == \"humedad_pct\") |> keep(columns: [\"_time\", \"_value\", \"_field\"]) |> group(columns: [\"_field\"]) |> sort(columns: [\"_time\"]) |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "displayName": "${__field.labels._field}"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "humedad_pct"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Humedad"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Acelerómetro (promedio de la ventana)",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prediccion\" and (r._field == \"ax\" or r._field == \"ay\" or r._field == \"az\")) |> keep(columns: [\"_time\", \"_value\", \"_field\"]) |> group(columns: [\"_field\"]) |> sort(columns: [\"_time\"]) |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "accG",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "displayName": "${__field.labels._field}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Giroscopio (RMS de la ventana)",
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prediccion\" and (r._field == \"gx\" or r._field == \"gy\" or r._field == \"gz\")) |> keep(columns: [\"_time\", \"_value\", \"_field\"]) |> group(columns: [\"_field\"]) |> sort(columns: [\"_time\"]) |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rotdegs",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "displayName": "${__field.labels._field}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "state-timeline",
+      "title": "Clases en el tiempo",
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prediccion\" and r._field == \"clase\") |> keep(columns: [\"_time\", \"_value\", \"tipo\"]) |> group(columns: [\"tipo\"]) |> sort(columns: [\"_time\"]) |> aggregateWindow(every: 2s, fn: last, createEmpty: false)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "options": {
+        "showValue": "auto",
+        "rowHeight": 0.8,
+        "mergeValues": true,
+        "alignValue": "left",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "spanNulls": 20000
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "confort": {
+                  "index": 0,
+                  "text": "Confort",
+                  "color": "green"
+                },
+                "riesgo_leve": {
+                  "index": 1,
+                  "text": "Riesgo leve",
+                  "color": "orange"
+                },
+                "riesgo": {
+                  "index": 2,
+                  "text": "Riesgo",
+                  "color": "red"
+                },
+                "quieto": {
+                  "index": 3,
+                  "text": "Quieto",
+                  "color": "green"
+                },
+                "normal": {
+                  "index": 4,
+                  "text": "Normal",
+                  "color": "green"
+                },
+                "agitacion": {
+                  "index": 5,
+                  "text": "Agitación",
+                  "color": "orange"
+                },
+                "boca_arriba": {
+                  "index": 6,
+                  "text": "Boca arriba",
+                  "color": "green"
+                },
+                "de_lado": {
+                  "index": 7,
+                  "text": "De lado",
+                  "color": "orange"
+                },
+                "boca_abajo": {
+                  "index": 8,
+                  "text": "Boca abajo",
+                  "color": "red"
+                },
+                "vacia": {
+                  "index": 9,
+                  "text": "Cuna vacía",
+                  "color": "blue"
+                },
+                "sin_modelo": {
+                  "index": 10,
+                  "text": "Sin modelo",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "displayName": "${__field.labels.tipo}",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "alertlist",
+      "title": "Alertas activas",
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 8,
+        "h": 9
+      },
+      "options": {
+        "viewMode": "list",
+        "groupMode": "default",
+        "sortOrder": 1,
+        "maxItems": 20,
+        "alertName": "",
+        "dashboardAlerts": false,
+        "alertInstanceLabelFilter": "",
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "noData": false,
+          "normal": false,
+          "error": true
+        },
+        "folder": {
+          "title": "IA for IoT"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "title": "Últimas predicciones",
+      "gridPos": {
+        "x": 8,
+        "y": 34,
+        "w": 16,
+        "h": 9
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb-iot"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-iot"
+          },
+          "query": "from(bucket: \"${bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prediccion\" and (r._field == \"clase\" or r._field == \"confianza\" or r._field == \"nivel\")) |> map(fn: (r) => ({r with _value: string(v: r._value)})) |> pivot(rowKey: [\"_time\", \"tipo\", \"dispositivo\"], columnKey: [\"_field\"], valueColumn: \"_value\") |> group() |> sort(columns: [\"_time\"], desc: true) |> limit(n: 30) |> keep(columns: [\"_time\", \"tipo\", \"dispositivo\", \"clase\", \"confianza\", \"nivel\"])",
+          "rawQuery": true,
+          "resultFormat": "table"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "clase"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "confort": {
+                        "index": 0,
+                        "text": "Confort",
+                        "color": "green"
+                      },
+                      "riesgo_leve": {
+                        "index": 1,
+                        "text": "Riesgo leve",
+                        "color": "orange"
+                      },
+                      "riesgo": {
+                        "index": 2,
+                        "text": "Riesgo",
+                        "color": "red"
+                      },
+                      "quieto": {
+                        "index": 3,
+                        "text": "Quieto",
+                        "color": "green"
+                      },
+                      "normal": {
+                        "index": 4,
+                        "text": "Normal",
+                        "color": "green"
+                      },
+                      "agitacion": {
+                        "index": 5,
+                        "text": "Agitación",
+                        "color": "orange"
+                      },
+                      "boca_arriba": {
+                        "index": 6,
+                        "text": "Boca arriba",
+                        "color": "green"
+                      },
+                      "de_lado": {
+                        "index": 7,
+                        "text": "De lado",
+                        "color": "orange"
+                      },
+                      "boca_abajo": {
+                        "index": 8,
+                        "text": "Boca abajo",
+                        "color": "red"
+                      },
+                      "vacia": {
+                        "index": 9,
+                        "text": "Cuna vacía",
+                        "color": "blue"
+                      },
+                      "sin_modelo": {
+                        "index": 10,
+                        "text": "Sin modelo",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,229 @@
+apiVersion: 1
+
+# Alertas de la Actividad 4: se disparan con el nivel confirmado de los modelos
+# (0 normal, 1 advertencia, 2 critica) que calcula el puente.
+groups:
+  - orgId: 1
+    name: modelos-cuarto-bebe
+    folder: IA for IoT
+    interval: 10s
+    rules:
+      - uid: postura-boca-abajo
+        title: Bebe boca abajo
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: influxdb-iot
+            model:
+              refId: A
+              datasource:
+                type: influxdb
+                uid: influxdb-iot
+              rawQuery: true
+              resultFormat: time_series
+              query: |
+                from(bucket: "iot")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "prediccion" and r._field == "nivel" and r.tipo == "vision")
+                  |> keep(columns: ["_time", "_value", "_field", "dispositivo"])
+                  |> group(columns: ["_field", "dispositivo"])
+                  |> sort(columns: ["_time"])
+                  |> last()
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              type: classic_conditions
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        isPaused: false
+        annotations:
+          summary: La camara detecto al bebe boca abajo
+          description: La clase boca_abajo se confirmo en varias imagenes seguidas. Revise la cuna de inmediato.
+        labels:
+          severity: critical
+          origen: modelo
+          tipo: vision
+
+      - uid: postura-de-lado
+        title: Bebe de lado
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: influxdb-iot
+            model:
+              refId: A
+              datasource:
+                type: influxdb
+                uid: influxdb-iot
+              rawQuery: true
+              resultFormat: time_series
+              query: |
+                from(bucket: "iot")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "prediccion" and r._field == "nivel" and r.tipo == "vision")
+                  |> keep(columns: ["_time", "_value", "_field", "dispositivo"])
+                  |> group(columns: ["_field", "dispositivo"])
+                  |> sort(columns: ["_time"])
+                  |> last()
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              type: classic_conditions
+              conditions:
+                - type: query
+                  evaluator:
+                    type: within_range
+                    params: [0.5, 1.5]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        isPaused: false
+        annotations:
+          summary: La camara detecto al bebe de lado
+          description: La clase de_lado se confirmo en varias imagenes seguidas.
+        labels:
+          severity: warning
+          origen: modelo
+          tipo: vision
+
+      - uid: movimiento-agitacion
+        title: Agitacion sostenida en la cuna
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: influxdb-iot
+            model:
+              refId: A
+              datasource:
+                type: influxdb
+                uid: influxdb-iot
+              rawQuery: true
+              resultFormat: time_series
+              query: |
+                from(bucket: "iot")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "prediccion" and r._field == "nivel" and r.tipo == "movimiento")
+                  |> keep(columns: ["_time", "_value", "_field", "dispositivo"])
+                  |> group(columns: ["_field", "dispositivo"])
+                  |> sort(columns: ["_time"])
+                  |> last()
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              type: classic_conditions
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        isPaused: false
+        annotations:
+          summary: El acelerometro detecto agitacion sostenida
+          description: La clase agitacion se confirmo en varias ventanas seguidas.
+        labels:
+          severity: warning
+          origen: modelo
+          tipo: movimiento
+
+      - uid: ambiente-riesgo
+        title: Ambiente en riesgo
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: influxdb-iot
+            model:
+              refId: A
+              datasource:
+                type: influxdb
+                uid: influxdb-iot
+              rawQuery: true
+              resultFormat: time_series
+              query: |
+                from(bucket: "iot")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "prediccion" and r._field == "nivel" and r.tipo == "clima")
+                  |> keep(columns: ["_time", "_value", "_field", "dispositivo"])
+                  |> group(columns: ["_field", "dispositivo"])
+                  |> sort(columns: ["_time"])
+                  |> last()
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              type: classic_conditions
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        isPaused: false
+        annotations:
+          summary: El modelo de ambiente detecto riesgo
+          description: La clase riesgo se confirmo en varias lecturas seguidas de temperatura y humedad.
+        labels:
+          severity: critical
+          origen: modelo
+          tipo: clima
