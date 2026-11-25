@@ -5,7 +5,7 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04-E95420?logo=ubuntu&logoColor=white)
 ![ESP32](https://img.shields.io/badge/ESP32-DHT11-E7352C?logo=espressif&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-11%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-130%20passing-brightgreen)
 
 Servidor web que recibe en tiempo real las lecturas de **temperatura y humedad**
 de un **ESP32 con sensor DHT11**, las evalúa contra los rangos de confort de un
@@ -437,11 +437,11 @@ uv run simular-esp32 --url http://127.0.0.1:8080/api/lecturas --count 20 --inter
 Salida esperada:
 
 ```
-Simulador ESP32 -> http://127.0.0.1:8080/api/lecturas (intervalo 2.0s)
-[12:00:01] {'dispositivo': 'esp32-dht11', 'temperatura_c': 21.05, 'humedad_pct': 48.3} -> HTTP 201
-[12:00:03] {'dispositivo': 'esp32-dht11', 'temperatura_c': 24.61, 'humedad_pct': 44.1} -> HTTP 201
+Simulador ESP32 -> http://127.0.0.1:8080/api/lecturas (intervalo 2s)
+[12:00:01] {'dispositivo': 'esp32-dht11', 'temperatura_c': 20.1, 'humedad_pct': 50.32} -> HTTP 201: {"id":1,...}
+[12:00:03] {'dispositivo': 'esp32-dht11', 'temperatura_c': 20.23, 'humedad_pct': 49.12} -> HTTP 201: {"id":2,...}
 ...
-Simulador finalizado: 20 lecturas enviadas.
+Simulador finalizado: 20 de 20 lecturas aceptadas.
 ```
 
 Parámetros:
@@ -883,18 +883,38 @@ IA_for_IoT/
 │   ├── schemas.py            # Esquemas Pydantic de entrada/salida
 │   ├── service.py            # Evaluación OK/ALERTA + registro
 │   ├── storage.py            # Escritura del CSV
-│   ├── simulador.py          # Entrypoint `simular-esp32`
+│   ├── simulador.py          # Entrypoint `simular-esp32` (HTTP)
+│   ├── publicador_mqtt.py    # Entrypoint `simular-esp32-mqtt`
+│   ├── generadores.py        # Datos simulados de los sensores
+│   ├── mqtt_bridge.py        # Puente MQTT -> InfluxDB + CSV
+│   ├── contrato.py           # Mensajes y clases de la Actividad 4
+│   ├── camara_simulada.py    # Entrypoint `simular-esp32cam`
+│   ├── capturar_dataset.py   # Entrypoint `capturar-dataset`
+│   ├── mcp_esp32.py          # Entrypoint `mcp-esp32-simulado`
+│   ├── mcp_puente.py         # Entrypoint `mcp-puente`
+│   ├── metricas.py           # Entrypoint `metricas-modelo`
+│   ├── modelo_ambiente.py    # Entrypoint `entrenar-ambiente`
 │   └── static/index.html     # Panel web (Chart.js)
 │
 ├── tests/
 │   ├── test_api.py           # 11 pruebas de la API
-│   └── test_mqtt_bridge.py   # 10 pruebas del puente MQTT
+│   ├── test_mqtt_bridge.py   # Puente MQTT y predicciones
+│   ├── test_simuladores.py   # Simuladores HTTP y MQTT, contrato y alertas
+│   ├── test_camara.py        # ESP32-CAM simulada y captura del dataset
+│   ├── test_notifier.py      # Notificador y Telegram
+│   ├── test_mcp.py           # Servidor MCP y puente stdio
+│   ├── test_modelos.py       # Métricas y modelo de ambiente
+│   ├── test_firmware.py      # El firmware usa el mismo contrato
+│   └── test_aws_lambda.py    # Lambda de la Práctica 3
 ├── firmware/
 │   ├── esp32_dht11/
 │   │   └── esp32_dht11.ino       # Sketch HTTP de la Práctica 1
 │   ├── esp32_dht11_mqtt/
 │   │   └── esp32_dht11_mqtt.ino  # Sketch MQTT de la Práctica 2
-│   └── esp32_dht11_aws/          # Sketch AWS IoT de la Práctica 3
+│   ├── esp32_dht11_aws/          # Sketch AWS IoT de la Práctica 3
+│   ├── esp32_edge_ai/            # Actividad 4: modelos, MQTT y servidor MCP
+│   └── esp32cam_vision/          # Actividad 4: postura con la ESP32-CAM
+├── modelos/                  # Métricas de los modelos de la Actividad 4
 ├── aws/                      # Práctica 3: plantilla, Lambda y dashboard
 ├── mqtt/                     # Stack de la Práctica 2
 │   ├── docker-compose.yml    # Mosquitto + InfluxDB + Grafana + bridge + notifier
@@ -916,7 +936,7 @@ IA_for_IoT/
 ## 12. Pruebas y calidad
 
 ```bash
-uv run pytest                     # 21 pruebas
+uv run pytest                     # 130 pruebas
 uv run ruff check .               # Lint
 uv run ruff format --check .      # Formato
 ```
@@ -1095,7 +1115,22 @@ uv run simular-esp32-mqtt --host 127.0.0.1 --user iot --password iot2026 --json 
 ```
 
 Opciones: `--temperatura` y `--humedad` fijan valores para probar alertas;
-`--json` publica un único topic JSON; `--count 0` publica indefinidamente.
+`--json` publica un único topic JSON; `--count 0` publica indefinidamente;
+`--semilla` repite la misma secuencia. Los fallos transitorios se reintentan con
+espera creciente (`--reintentos`) y Ctrl+C detiene el simulador.
+
+El modo MQTT local **no** se conecta a AWS. Para publicar en AWS IoT Core con el
+formato de la Práctica 3 hay que pedirlo con `--aws` y los certificados del
+dispositivo, que nunca se suben a git:
+
+```bash
+uv run simular-esp32-mqtt --aws --host <ENDPOINT>-ats.iot.us-east-1.amazonaws.com \
+  --ca aws/certs/AmazonRootCA1.pem --cert aws/certs/device.pem.crt \
+  --key aws/certs/private.pem.key --count 5
+```
+
+Usa el mismo client id que la placa (`esp32-dht11`): si la placa está conectada, AWS
+la desconecta mientras dura la prueba.
 
 ### 14.7 Firmware ESP32 (MQTT)
 
@@ -1200,6 +1235,154 @@ flowchart LR
 
 Los certificados, la clave privada, `secrets.h` y el token de la API no se suben
 a git.
+
+---
+
+## 16. Actividad 4: modelos de IA en el dispositivo
+
+El ESP32 clasifica el ambiente (DHT11) y el movimiento de la cuna (MPU6050), y una
+ESP32-CAM clasifica la postura del bebé. Las placas publican la **clase** y la
+**confianza** por MQTT; la plataforma de la Práctica 2 las guarda, las muestra y
+avisa por Telegram. El ESP32 también es un **servidor MCP**. El caso, el contrato de
+mensajes y los responsables están en [`ENTREGA_ACTIVIDAD_4.md`](ENTREGA_ACTIVIDAD_4.md).
+
+> Prototipo académico. El dataset de imágenes usa un muñeco, nunca un bebé real. No
+> reemplaza la supervisión de un adulto.
+
+### 16.1 Levantar la plataforma
+
+```bash
+cp mqtt/.env.example mqtt/.env    # Windows: Copy-Item mqtt/.env.example mqtt/.env
+docker compose -f mqtt/docker-compose.yml up -d --build
+```
+
+Cambia las contraseñas de `mqtt/.env` antes de levantarla. El panel nuevo es **IA for
+IoT - Cuarto del bebe (modelos en el dispositivo)**, en <http://127.0.0.1:3000>. El
+puente guarda además `data/predicciones.csv` y el measurement `prediccion`.
+
+En el primer arranque Grafana tarda cerca de un minuto en aplicar la política de
+avisos: espera antes de probar las alertas.
+
+### 16.2 Probar sin hardware
+
+Los simuladores leen `MQTT_USERNAME` y `MQTT_PASSWORD` del entorno o del `.env` de la
+raíz; también aceptan `--user` y `--password`.
+
+```bash
+# ESP32: clima cada 10 s y movimiento cada 2 s
+uv run simular-esp32-mqtt --edge
+
+# Forzar alertas de ambiente y movimiento
+uv run simular-esp32-mqtt --edge --temperatura 27 --clase-movimiento agitacion --count 5
+
+# ESP32-CAM: postura por MQTT y video en http://127.0.0.1:8081/
+uv run simular-esp32cam --clase boca_abajo
+
+# Con las fotos del equipo (una carpeta por clase, como exporta Roboflow)
+uv run simular-esp32cam --carpeta dataset --precision 0.9
+```
+
+Los dispositivos simulados terminan en `-sim` (`esp32-cuna-sim`, `esp32-cam-sim`) para
+no confundirlos con las placas en las evidencias. La cámara simulada **no ejecuta un
+modelo**: publica la clase de la carpeta de cada imagen.
+
+Una alerta se confirma cuando la misma clase aparece `ALERTA_REPETICIONES` veces
+seguidas (3) con confianza de al menos `ALERTA_CONFIANZA` (0.8):
+
+| Alerta | Condición | Severidad |
+|---|---|---|
+| Bebe boca abajo | `boca_abajo` confirmada | critical |
+| Bebe de lado | `de_lado` confirmada | warning |
+| Agitacion sostenida en la cuna | `agitacion` confirmada | warning |
+| Ambiente en riesgo | `riesgo` confirmado | critical |
+
+### 16.3 Avisos por Telegram
+
+1. Crea el bot con **@BotFather** y agrégalo al grupo del equipo.
+2. Escribe un mensaje en el grupo y abre `https://api.telegram.org/bot<TOKEN>/getUpdates`
+   en el navegador para ver el `chat.id`.
+3. Pon `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID` en `mqtt/.env` y vuelve a ejecutar
+   `docker compose -f mqtt/docker-compose.yml up -d`.
+
+`docker logs ia_for_iot_notifier` debe decir `Telegram: activo`. Una alerta que sigue
+activa se repite cada `TELEGRAM_REPETIR_S` segundos (300). El token es un secreto: no
+lo subas al repositorio ni lo pegues en un chat.
+
+### 16.4 Servidor MCP
+
+El firmware atiende `http://cuarto-bebe.local/mcp` (o la IP del Monitor Serial) con las
+herramientas `leer_ambiente`, `leer_movimiento`, `leer_postura` y `estado_general`. Sin
+la placa se prueba con una copia que lee el broker:
+
+```bash
+uv run mcp-esp32-simulado          # http://127.0.0.1:8090/mcp
+```
+
+**VS Code** (`.vscode/mcp.json`):
+
+```json
+{ "servers": { "cuarto-bebe": { "type": "http", "url": "http://127.0.0.1:8090/mcp" } } }
+```
+
+**Claude Desktop** usa servidores locales por stdio; `mcp-puente` los conecta con la
+placa (`claude_desktop_config.json`):
+
+```json
+{ "mcpServers": { "cuarto-bebe": { "command": "uv",
+  "args": ["--directory", "RUTA_DEL_REPOSITORIO", "run", "mcp-puente", "--url", "http://cuarto-bebe.local/mcp"] } } }
+```
+
+El cliente y la placa deben estar en la misma red. El servidor admite la versión
+2026-07-28 del protocolo y las que empiezan con `initialize`.
+
+### 16.5 Firmware
+
+| Placa | Carpeta | Modos |
+|---|---|---|
+| ESP32 | `firmware/esp32_edge_ai/` | `MODO_CAPTURA 1`: imprime los 6 ejes a 50 Hz. `0`: modelos, MQTT y MCP |
+| ESP32-CAM | `firmware/esp32cam_vision/` | `MODO_CAPTURA 1`: `/capture` y `/stream`. `0`: clasifica y publica |
+
+En cada carpeta copia `secrets.h.example` a `secrets.h` y complétalo. Mientras un modelo
+no exista, la placa publica `sin_modelo` y el resto del sistema funciona.
+
+```bash
+arduino-cli lib install "DHT sensor library" "Adafruit Unified Sensor" PubSubClient ArduinoJson
+arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app firmware/esp32_edge_ai
+arduino-cli compile --fqbn esp32:esp32:esp32cam firmware/esp32cam_vision
+```
+
+### 16.6 Modelos
+
+| Modelo | Cómo se entrena | Cómo llega a la placa |
+|---|---|---|
+| Ambiente | `uv run entrenar-ambiente --datos datos_ambiente.csv` | `modelo_ambiente.h` (C puro, generado) |
+| Movimiento | Edge Impulse, con `edge-impulse-data-forwarder` | Biblioteca Arduino y `modelo_movimiento.h` |
+| Postura | Dataset en Roboflow y entrenamiento en Edge Impulse | Biblioteca Arduino y `modelo_vision.h` |
+
+El ambiente va en C puro porque dos bibliotecas Arduino de Edge Impulse no pueden
+convivir en un firmware. El `modelo_ambiente.h` incluido se entrenó con **datos
+sintéticos**: sirve para probar, y hay que reentrenarlo con lecturas reales
+(`temperatura_c`, `humedad_pct`, `clase`).
+
+```bash
+# Fotos etiquetadas, de la ESP32-CAM en modo captura o del simulador
+uv run capturar-dataset --url http://IP_DE_LA_CAMARA/capture --clase boca_abajo --cantidad 50
+
+# Matriz de confusión y métricas desde un CSV con las columnas real y prediccion
+uv run metricas-modelo --entrada resultados.csv --salida modelos/vision --tipo vision --titulo "Postura"
+```
+
+### 16.7 Solución de problemas
+
+| Síntoma | Causa probable | Solución |
+|---|---|---|
+| Las placas no llegan al broker | La red aísla los equipos o es de 5 GHz | Usa el punto de acceso de un celular en 2,4 GHz |
+| `No se pudo autenticar con el broker` | Usuario o clave | Revisa `mqtt/.env` y `--user`/`--password` |
+| El puente dice `Prediccion descartada` | La clase no está en el contrato | Usa los nombres exactos de `ENTREGA_ACTIVIDAD_4.md` |
+| La alerta no se dispara | Menos de 3 predicciones seguidas o confianza menor a 0,8 | Baja `ALERTA_CONFIANZA` o revisa el modelo |
+| No llega el Telegram | Falta el token o el chat | `docker logs ia_for_iot_notifier` |
+| `cuarto-bebe.local` no responde | La red bloquea mDNS | Usa la IP del Monitor Serial |
+| La ESP32-CAM reinicia o no infiere | Falta memoria | Imagen de 96×96 y un MobileNetV1 más pequeño |
 
 ---
 
