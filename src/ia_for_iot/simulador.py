@@ -7,32 +7,92 @@ sin tener la placa fisica conectada.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
-import random
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit
+
+from .config import get_settings
+from .generadores import GeneradorDHT11
+
+# Respuestas que pueden resolverse solas si se reintenta.
+CODIGOS_TRANSITORIOS = {408, 425, 429, 500, 502, 503, 504}
 
 
-def generar_lectura(dev_index: int) -> dict[str, Any]:
-    """Genera una lectura plausible, con excursiones ocasionales fuera de rango."""
-    base_t = 21.0
-    base_h = 50.0
-    # Un desplazamiento lento que hace que la sala se caliente o se enfoque.
-    deriva = 2.5 * ((dev_index % 12) / 12)
-    temperatura = base_t + deriva + random.uniform(-0.8, 0.8)
-    humedad = base_h - random.uniform(-5.0, 5.0) + deriva * 1.5
-    if random.random() < 0.12:
-        temperatura += random.choice([-3.5, 3.5])
-    if random.random() < 0.12:
-        humedad += random.choice([-15.0, 15.0])
-    return {
-        "dispositivo": "esp32-dht11",
-        "temperatura_c": round(temperatura, 2),
-        "humedad_pct": round(min(100.0, max(0.0, humedad)), 2),
-    }
+def espera_reintento(intento: int, maximo: float = 30.0) -> float:
+    """Espera creciente entre reintentos: 1, 2, 4, 8... hasta ``maximo``."""
+    return min(maximo, 2.0 ** max(0, intento - 1))
+
+
+def no_negativo(texto: str) -> float:
+    """Tipo de argparse: numero mayor o igual que cero."""
+    valor = float(texto)
+    if not valor >= 0 or valor == float("inf"):
+        raise argparse.ArgumentTypeError("debe ser un numero mayor o igual que 0")
+    return valor
+
+
+def entero_no_negativo(texto: str) -> int:
+    """Tipo de argparse: entero mayor o igual que cero."""
+    valor = int(texto)
+    if valor < 0:
+        raise argparse.ArgumentTypeError("debe ser un entero mayor o igual que 0")
+    return valor
+
+
+def _url(texto: str) -> str:
+    """Tipo de argparse: URL http o https con host."""
+    partes = urlsplit(texto)
+    if partes.scheme not in ("http", "https") or not partes.hostname:
+        raise argparse.ArgumentTypeError("debe empezar por http:// o https://")
+    return texto
+
+
+def url_visible(url: str) -> str:
+    """URL apta para imprimir: sin usuario, clave ni parametros."""
+    partes = urlsplit(url)
+    puerto = f":{partes.port}" if partes.port else ""
+    return f"{partes.scheme}://{partes.hostname}{puerto}{partes.path}"
+
+
+def agregar_opciones_lectura(parser: argparse.ArgumentParser) -> None:
+    """Opciones de las lecturas, comunes a los modos HTTP y MQTT."""
+    parser.add_argument(
+        "--interval", type=no_negativo, default=10.0, help="Segundos entre lecturas."
+    )
+    parser.add_argument(
+        "--count",
+        type=entero_no_negativo,
+        default=0,
+        help="Numero de lecturas; 0 significa infinito.",
+    )
+    parser.add_argument(
+        "--temperatura",
+        type=float,
+        default=None,
+        help="Fija la temperatura (C) para todas las lecturas (util para probar alertas).",
+    )
+    parser.add_argument(
+        "--humedad",
+        type=float,
+        default=None,
+        help="Fija la humedad (%%) para todas las lecturas (util para probar alertas).",
+    )
+    parser.add_argument("--dispositivo", default="", help="Identificador del dispositivo simulado.")
+    parser.add_argument(
+        "--semilla", type=int, default=None, help="Semilla para repetir la misma secuencia."
+    )
+    parser.add_argument(
+        "--reintentos",
+        type=entero_no_negativo,
+        default=4,
+        help="Reintentos ante fallos transitorios, con espera creciente.",
+    )
 
 
 def _enviar(
@@ -51,37 +111,101 @@ def _enviar(
         return error.code, error.read().decode("utf-8", errors="replace")
 
 
-def main() -> None:
-    """Punto de entrada de ``simular-esp32``."""
+def enviar_con_reintentos(
+    url: str,
+    payload: dict[str, Any],
+    api_key: str = "",
+    *,
+    reintentos: int = 4,
+    timeout: float = 10.0,
+    dormir: Callable[[float], None] = time.sleep,
+) -> tuple[int, str]:
+    """Envia una lectura y reintenta los fallos transitorios.
+
+    Devuelve el codigo 0 si no hubo respuesta del servidor. Los errores 4xx
+    (clave invalida, datos fuera de limites) no se reintentan.
+    """
+    for intento in range(1, reintentos + 2):
+        try:
+            codigo, cuerpo = _enviar(url, payload, api_key, timeout)
+        except (OSError, http.client.HTTPException) as error:
+            codigo, cuerpo = 0, str(getattr(error, "reason", error))
+
+        if codigo != 0 and codigo not in CODIGOS_TRANSITORIOS:
+            return codigo, cuerpo
+        if intento <= reintentos:
+            espera = espera_reintento(intento)
+            motivo = f"HTTP {codigo}" if codigo else f"sin conexion ({cuerpo})"
+            print(
+                f"  {motivo}; reintento {intento}/{reintentos} en {espera:g} s",
+                flush=True,
+            )
+            dormir(espera)
+    return codigo, cuerpo
+
+
+def crear_parser() -> argparse.ArgumentParser:
+    """Opciones de ``simular-esp32``."""
     parser = argparse.ArgumentParser(description="Simulador de lecturas DHT11 (ESP32).")
     parser.add_argument(
         "--url",
+        type=_url,
         default="http://127.0.0.1:8000/api/lecturas",
-        help="URL del endpoint de recepciÃ³n (por defecto, el servidor local).",
+        help="URL del endpoint de recepcion (por defecto, el servidor local).",
     )
-    parser.add_argument("--interval", type=float, default=10.0, help="Segundos entre lecturas.")
     parser.add_argument(
-        "--count", type=int, default=0, help="Numero de lecturas; 0 significa infinito."
+        "--api-key",
+        default=None,
+        help="Valor de la cabecera X-API-Key (por defecto, DEVICE_API_KEY del entorno o .env).",
     )
-    parser.add_argument("--api-key", default="", help="Valor de la cabecera X-API-Key.")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--timeout", type=no_negativo, default=10.0, help="Segundos de espera por respuesta."
+    )
+    agregar_opciones_lectura(parser)
+    return parser
 
-    print(f"Simulador ESP32 -> {args.url} (intervalo {args.interval}s)")
-    enviados = 0
-    while args.count == 0 or enviados < args.count:
-        payload = generar_lectura(enviados)
-        codigo, cuerpo = _enviar(args.url, payload, args.api_key)
-        marca = datetime.now(UTC).strftime("%H:%M:%S")
-        if codigo in (200, 201):
-            print(f"[{marca}] {payload} -> HTTP {codigo}")
-        else:
-            print(f"[{marca}] {payload} -> HTTP {codigo}: {cuerpo[:160]}")
-        enviados += 1
-        if args.count == 0 or enviados < args.count:
-            time.sleep(args.interval)
 
-    print(f"Simulador finalizado: {enviados} lecturas enviadas.")
+def main(argv: Sequence[str] | None = None) -> int:
+    """Punto de entrada de ``simular-esp32``."""
+    args = crear_parser().parse_args(argv)
+    settings = get_settings()
+    api_key = settings.device_api_key if args.api_key is None else args.api_key
+    generador = GeneradorDHT11(
+        settings,
+        dispositivo=args.dispositivo or "esp32-dht11",
+        temperatura=args.temperatura,
+        humedad=args.humedad,
+        semilla=args.semilla,
+    )
+
+    print(f"Simulador ESP32 -> {url_visible(args.url)} (intervalo {args.interval:g}s)", flush=True)
+    intentadas = aceptadas = 0
+    try:
+        while args.count == 0 or intentadas < args.count:
+            payload = generador.siguiente()
+            codigo, cuerpo = enviar_con_reintentos(
+                args.url,
+                payload,
+                api_key,
+                reintentos=args.reintentos,
+                timeout=args.timeout,
+            )
+            intentadas += 1
+            marca = datetime.now(UTC).strftime("%H:%M:%S")
+            resultado = f"HTTP {codigo}" if codigo else "ERROR sin conexion"
+            print(f"[{marca}] {payload} -> {resultado}: {cuerpo[:160]}", flush=True)
+            if codigo in (200, 201):
+                aceptadas += 1
+            elif codigo in (401, 403):
+                print("  Revisa --api-key o DEVICE_API_KEY.", flush=True)
+            if args.count == 0 or intentadas < args.count:
+                time.sleep(args.interval)
+    except KeyboardInterrupt:
+        print("\nDetenido por el usuario.", flush=True)
+
+    print(f"Simulador finalizado: {aceptadas} de {intentadas} lecturas aceptadas.", flush=True)
+    return 1 if intentadas and not aceptadas else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
