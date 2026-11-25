@@ -174,7 +174,8 @@ class ServidorMcp:
         if isinstance(identificador, bool) or not isinstance(identificador, str | int):
             return 400, _error(None, PETICION_INVALIDA, "id invalido")
 
-        parametros = mensaje.get("params") or {}
+        parametros = mensaje.get("params")
+        parametros = {} if parametros is None else parametros
         if not isinstance(parametros, dict):
             return 400, _error(identificador, PARAMETROS_INVALIDOS, "params debe ser un objeto")
 

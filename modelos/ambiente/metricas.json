@@ -1,0 +1,47 @@
+{
+  "muestras": 374,
+  "exactitud": 0.9759358288770054,
+  "f1_macro": 0.9740297356890619,
+  "clases": [
+    "confort",
+    "riesgo_leve",
+    "riesgo"
+  ],
+  "matriz": [
+    [
+      51,
+      0,
+      0
+    ],
+    [
+      3,
+      131,
+      3
+    ],
+    [
+      0,
+      3,
+      183
+    ]
+  ],
+  "por_clase": {
+    "confort": {
+      "precision": 0.9444444444444444,
+      "sensibilidad": 1.0,
+      "f1": 0.9714285714285714,
+      "soporte": 51
+    },
+    "riesgo_leve": {
+      "precision": 0.9776119402985075,
+      "sensibilidad": 0.9562043795620438,
+      "f1": 0.966789667896679,
+      "soporte": 137
+    },
+    "riesgo": {
+      "precision": 0.9838709677419355,
+      "sensibilidad": 0.9838709677419355,
+      "f1": 0.9838709677419355,
+      "soporte": 186
+    }
+  }
+}

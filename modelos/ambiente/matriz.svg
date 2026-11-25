@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 418 384" width="418" height="384" font-family="sans-serif" font-size="13" role="img">
+<title>Matriz de confusión: Modelo de ambiente (datos sintéticos)</title>
+<rect width="418" height="384" fill="#ffffff"/>
+<text x="16" y="28" font-size="16" font-weight="bold">Modelo de ambiente (datos sintéticos)</text>
+<text x="16" y="50" fill="#555555">Exactitud 97.6%, 374 muestras. Filas: real.</text>
+<text x="174.0" y="84" text-anchor="middle">confort</text>
+<text x="262.0" y="84" text-anchor="middle">riesgo_leve</text>
+<text x="350.0" y="84" text-anchor="middle">riesgo</text>
+<text x="120" y="144.0" text-anchor="end">confort</text>
+<rect x="130" y="96" width="86" height="86" fill="#1f6f43" fill-opacity="1.00" stroke="#cccccc"/>
+<text x="174.0" y="140.0" text-anchor="middle" fill="#ffffff" font-size="18">51</text><text x="174.0" y="160.0" text-anchor="middle" fill="#ffffff">100%</text>
+<rect x="218" y="96" width="86" height="86" fill="#b3261e" fill-opacity="0.06" stroke="#cccccc"/>
+<text x="262.0" y="140.0" text-anchor="middle" fill="#111111" font-size="18">0</text><text x="262.0" y="160.0" text-anchor="middle" fill="#111111">0%</text>
+<rect x="306" y="96" width="86" height="86" fill="#b3261e" fill-opacity="0.06" stroke="#cccccc"/>
+<text x="350.0" y="140.0" text-anchor="middle" fill="#111111" font-size="18">0</text><text x="350.0" y="160.0" text-anchor="middle" fill="#111111">0%</text>
+<text x="120" y="232.0" text-anchor="end">riesgo_leve</text>
+<rect x="130" y="184" width="86" height="86" fill="#b3261e" fill-opacity="0.08" stroke="#cccccc"/>
+<text x="174.0" y="228.0" text-anchor="middle" fill="#111111" font-size="18">3</text><text x="174.0" y="248.0" text-anchor="middle" fill="#111111">2%</text>
+<rect x="218" y="184" width="86" height="86" fill="#1f6f43" fill-opacity="0.96" stroke="#cccccc"/>
+<text x="262.0" y="228.0" text-anchor="middle" fill="#ffffff" font-size="18">131</text><text x="262.0" y="248.0" text-anchor="middle" fill="#ffffff">96%</text>
+<rect x="306" y="184" width="86" height="86" fill="#b3261e" fill-opacity="0.08" stroke="#cccccc"/>
+<text x="350.0" y="228.0" text-anchor="middle" fill="#111111" font-size="18">3</text><text x="350.0" y="248.0" text-anchor="middle" fill="#111111">2%</text>
+<text x="120" y="320.0" text-anchor="end">riesgo</text>
+<rect x="130" y="272" width="86" height="86" fill="#b3261e" fill-opacity="0.06" stroke="#cccccc"/>
+<text x="174.0" y="316.0" text-anchor="middle" fill="#111111" font-size="18">0</text><text x="174.0" y="336.0" text-anchor="middle" fill="#111111">0%</text>
+<rect x="218" y="272" width="86" height="86" fill="#b3261e" fill-opacity="0.08" stroke="#cccccc"/>
+<text x="262.0" y="316.0" text-anchor="middle" fill="#111111" font-size="18">3</text><text x="262.0" y="336.0" text-anchor="middle" fill="#111111">2%</text>
+<rect x="306" y="272" width="86" height="86" fill="#1f6f43" fill-opacity="0.98" stroke="#cccccc"/>
+<text x="350.0" y="316.0" text-anchor="middle" fill="#ffffff" font-size="18">183</text><text x="350.0" y="336.0" text-anchor="middle" fill="#ffffff">98%</text>
+</svg>
