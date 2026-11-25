@@ -22,6 +22,8 @@ simular-esp32 = "ia_for_iot.simulador:main"
 simular-esp32-mqtt = "ia_for_iot.publicador_mqtt:main"
 simular-esp32cam = "ia_for_iot.camara_simulada:main"
 capturar-dataset = "ia_for_iot.capturar_dataset:main"
+mcp-esp32-simulado = "ia_for_iot.mcp_esp32:main"
+mcp-puente = "ia_for_iot.mcp_puente:main"
 mqtt-bridge = "ia_for_iot.mqtt_bridge:main"
 
 [dependency-groups]
