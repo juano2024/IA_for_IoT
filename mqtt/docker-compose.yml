@@ -9,7 +9,7 @@
 #   influxdb  : base de datos de series de tiempo (8086)
 #   grafana   : dashboards y alertas (3000)
 #   bridge    : se suscribe al broker y escribe en InfluxDB + CSV
-#   notifier  : recibe los webhooks de alerta de Grafana
+#   notifier  : recibe los webhooks de alerta de Grafana y avisa por Telegram
 
 name: ia-for-iot-mqtt
 
@@ -139,6 +139,11 @@ services:
     container_name: ia_for_iot_notifier
     restart: unless-stopped
     command: ["python", "/app/notifier.py"]
+    environment:
+      # Sin token o chat solo se escribe el log (Actividad 4).
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+      TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID:-}"
+      TELEGRAM_REPETIR_S: "${TELEGRAM_REPETIR_S:-300}"
     volumes:
       - ./notifier/notifier.py:/app/notifier.py:ro
       - ./notifier/data:/app/data
