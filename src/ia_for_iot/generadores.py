@@ -138,7 +138,15 @@ def prediccion_clima(
 
 
 # Desviacion de la aceleracion (g) y RMS del giroscopio (grados/s) por clase.
-_INTENSIDAD = {"quieto": (0.01, 1.0), "normal": (0.06, 25.0), "agitacion": (0.25, 140.0)}
+_INTENSIDAD = {
+    "quieto": (0.01, 1.0),
+    "normal": (0.06, 25.0),
+    "leve": (0.06, 25.0),
+    "agitacion": (0.25, 140.0),
+    "brusco": (0.25, 140.0),
+}
+# Clases del modelo de movimiento del equipo (Edge Impulse).
+CLASES_MOVIMIENTO_EQUIPO = ("quieto", "leve", "brusco")
 
 
 def prediccion_movimiento(dispositivo: str, generador: GeneradorClases) -> dict[str, Any]:

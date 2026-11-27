@@ -50,9 +50,12 @@ static const char *const MCP_HERRAMIENTAS[4][3] = {
 
 // Nivel de cada clase: 0 normal, 1 advertencia, 2 critica.
 static int mcpNivel(const char *clase) {
-  if (strcmp(clase, "riesgo") == 0 || strcmp(clase, "boca_abajo") == 0) return 2;
+  if (strcmp(clase, "riesgo") == 0 || strcmp(clase, "boca_abajo") == 0 ||
+      strcmp(clase, "brusco") == 0) {
+    return 2;
+  }
   if (strcmp(clase, "riesgo_leve") == 0 || strcmp(clase, "agitacion") == 0 ||
-      strcmp(clase, "de_lado") == 0) {
+      strcmp(clase, "de_lado") == 0 || strcmp(clase, "leve") == 0) {
     return 1;
   }
   return 0;

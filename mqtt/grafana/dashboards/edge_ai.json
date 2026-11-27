@@ -176,8 +176,18 @@
                   "text": "Agitación",
                   "color": "orange"
                 },
-                "sin_modelo": {
+                "leve": {
                   "index": 3,
+                  "text": "Movimiento leve",
+                  "color": "orange"
+                },
+                "brusco": {
+                  "index": 4,
+                  "text": "Movimiento brusco",
+                  "color": "red"
+                },
+                "sin_modelo": {
+                  "index": 5,
                   "text": "Sin modelo",
                   "color": "gray"
                 }
@@ -785,28 +795,38 @@
                   "text": "Agitación",
                   "color": "orange"
                 },
-                "boca_arriba": {
+                "leve": {
                   "index": 6,
+                  "text": "Movimiento leve",
+                  "color": "orange"
+                },
+                "brusco": {
+                  "index": 7,
+                  "text": "Movimiento brusco",
+                  "color": "red"
+                },
+                "boca_arriba": {
+                  "index": 8,
                   "text": "Boca arriba",
                   "color": "green"
                 },
                 "de_lado": {
-                  "index": 7,
+                  "index": 9,
                   "text": "De lado",
                   "color": "orange"
                 },
                 "boca_abajo": {
-                  "index": 8,
+                  "index": 10,
                   "text": "Boca abajo",
                   "color": "red"
                 },
                 "vacia": {
-                  "index": 9,
+                  "index": 11,
                   "text": "Cuna vacía",
                   "color": "blue"
                 },
                 "sin_modelo": {
-                  "index": 10,
+                  "index": 12,
                   "text": "Sin modelo",
                   "color": "gray"
                 }
@@ -936,28 +956,38 @@
                         "text": "Agitación",
                         "color": "orange"
                       },
-                      "boca_arriba": {
+                      "leve": {
                         "index": 6,
+                        "text": "Movimiento leve",
+                        "color": "orange"
+                      },
+                      "brusco": {
+                        "index": 7,
+                        "text": "Movimiento brusco",
+                        "color": "red"
+                      },
+                      "boca_arriba": {
+                        "index": 8,
                         "text": "Boca arriba",
                         "color": "green"
                       },
                       "de_lado": {
-                        "index": 7,
+                        "index": 9,
                         "text": "De lado",
                         "color": "orange"
                       },
                       "boca_abajo": {
-                        "index": 8,
+                        "index": 10,
                         "text": "Boca abajo",
                         "color": "red"
                       },
                       "vacia": {
-                        "index": 9,
+                        "index": 11,
                         "text": "Cuna vacía",
                         "color": "blue"
                       },
                       "sin_modelo": {
-                        "index": 10,
+                        "index": 12,
                         "text": "Sin modelo",
                         "color": "gray"
                       }

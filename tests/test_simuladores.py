@@ -15,6 +15,7 @@ import pytest
 from ia_for_iot import publicador_mqtt, simulador
 from ia_for_iot.config import Settings
 from ia_for_iot.contrato import (
+    CLASES,
     ContratoInvalidoError,
     FiltroAlertas,
     clasificar_ambiente,
@@ -115,8 +116,9 @@ def test_predicciones_simuladas_cumplen_el_contrato(settings: Settings) -> None:
     for _ in range(50):
         validar_prediccion("clima", prediccion_clima(dht.siguiente(), settings, clima))
         validar_prediccion("movimiento", prediccion_movimiento("esp32-cuna-sim", movimiento))
-    forzada = GeneradorClases("movimiento", clase="agitacion")
-    assert prediccion_movimiento("x", forzada)["clase"] == "agitacion"
+    for clase in CLASES["movimiento"]:
+        forzada = GeneradorClases("movimiento", clase=clase)
+        validar_prediccion("movimiento", prediccion_movimiento("x", forzada))
 
 
 # ------------------------------------------------------------------- contrato
@@ -378,3 +380,42 @@ def test_tls_verifica_el_certificado_del_broker() -> None:
     )
     assert cliente.tls["ca_certs"] == "ca.pem"
     assert cliente.tls["tls_version"].name == "PROTOCOL_TLS_CLIENT"
+
+
+# --------------------------------------------- firmware del equipo (v3 y v4)
+@pytest.mark.parametrize(
+    ("tipo", "cuerpo", "clase"),
+    [
+        (
+            "clima",
+            b'{"dispositivo":"esp32-cuna","temperatura_c":27.4,"humedad_pct":52.0,'
+            b'"clase_ambiente":"riesgo","confianza":0.91,"nivel":2,"alarma":true}',
+            "riesgo",
+        ),
+        (
+            "clima",
+            b'{"dispositivo":"esp32-cuna","temperatura_c":20.0,"humedad_pct":50.0,'
+            b'"clase_ambiente":"calentando","confianza":0,"nivel":0,"alarma":false}',
+            "sin_modelo",
+        ),
+        (
+            "movimiento",
+            b'{"dispositivo":"esp32-cuna","clase_movimiento":"movimiento_brusco",'
+            b'"confianza":0.88,"nivel":2,"alarma":true}',
+            "brusco",
+        ),
+        ("movimiento", b'{"clase_movimiento":"Leve","confianza":0.7,"nivel":1}', "leve"),
+        ("movimiento", b'{"clase_movimiento":"quieto","confianza":0.95,"nivel":0}', "quieto"),
+        ("movimiento", b'{"clase_movimiento":"incierto","confianza":0.4,"nivel":0}', "sin_modelo"),
+    ],
+)
+def test_acepta_los_mensajes_del_firmware_del_equipo(tipo: str, cuerpo: bytes, clase: str) -> None:
+    assert decodificar(tipo, cuerpo)["clase"] == clase
+
+
+def test_movimiento_brusco_es_critico() -> None:
+    filtro = FiltroAlertas()
+    niveles = [filtro.nivel("movimiento", "cuna", "brusco", 0.9) for _ in range(3)]
+    assert niveles == [0, 0, 2]
+    with pytest.raises(ContratoInvalidoError):
+        decodificar("movimiento", b'{"clase_movimiento":"saltando","confianza":0.9}')

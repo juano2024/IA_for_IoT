@@ -18,7 +18,8 @@ SIN_MODELO = "sin_modelo"
 # Nivel de cada clase: 0 normal, 1 advertencia, 2 critica.
 NIVELES: dict[str, dict[str, int]] = {
     "clima": {"confort": 0, "riesgo_leve": 1, "riesgo": 2},
-    "movimiento": {"quieto": 0, "normal": 0, "agitacion": 1},
+    # leve y brusco son las clases del modelo de Edge Impulse del equipo.
+    "movimiento": {"quieto": 0, "normal": 0, "agitacion": 1, "leve": 1, "brusco": 2},
     "vision": {"boca_arriba": 0, "de_lado": 1, "boca_abajo": 2, "vacia": 0},
 }
 
@@ -54,6 +55,30 @@ def _numero(datos: dict[str, Any], campo: str, minimo: float, maximo: float) -> 
     return numero
 
 
+# Estados del firmware del equipo que todavia no son una prediccion.
+SIN_PREDICCION = {"calentando", "incierto", "sin_datos"}
+
+
+def normalizar_clase(tipo: str, datos: dict[str, Any]) -> Any:
+    """Clase del mensaje, aceptando tambien el formato del firmware v3.
+
+    Ese firmware envia ``clase_ambiente`` o ``clase_movimiento`` y etiquetas de
+    Edge Impulse que contienen ``quieto``, ``leve`` o ``brusco``.
+    """
+    clase = datos.get("clase")
+    if clase is None:
+        clase = datos.get("clase_ambiente" if tipo == "clima" else f"clase_{tipo}")
+    if not isinstance(clase, str):
+        return clase
+    if clase in SIN_PREDICCION:
+        return SIN_MODELO
+    if tipo == "movimiento" and clase not in NIVELES[tipo]:
+        for nombre in ("brusco", "leve", "quieto"):
+            if nombre in clase.lower():
+                return nombre
+    return clase
+
+
 def validar_prediccion(tipo: str, datos: Any) -> dict[str, Any]:
     """Valida y normaliza una prediccion; lanza ``ContratoInvalidoError``."""
     if tipo not in NIVELES:
@@ -61,7 +86,7 @@ def validar_prediccion(tipo: str, datos: Any) -> dict[str, Any]:
     if not isinstance(datos, dict):
         raise ContratoInvalidoError("el mensaje debe ser un objeto JSON")
 
-    clase = datos.get("clase")
+    clase = normalizar_clase(tipo, datos)
     if clase != SIN_MODELO and clase not in NIVELES[tipo]:
         raise ContratoInvalidoError(f"clase desconocida para {tipo}: {clase!r}")
     if "confianza" not in datos:

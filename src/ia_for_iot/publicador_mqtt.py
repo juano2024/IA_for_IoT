@@ -28,6 +28,7 @@ import paho.mqtt.client as mqtt
 from .config import get_settings
 from .contrato import CLASES
 from .generadores import (
+    CLASES_MOVIMIENTO_EQUIPO,
     GeneradorClases,
     GeneradorDHT11,
     prediccion_clima,
@@ -328,7 +329,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     clima = GeneradorClases("clima", semilla=args.semilla)
     movimiento = GeneradorClases(
-        "movimiento", clase=args.clase_movimiento, semilla=args.semilla, pesos=(6, 3, 1)
+        "movimiento",
+        clase=args.clase_movimiento,
+        semilla=args.semilla,
+        pesos=(6, 3, 1),
+        clases=CLASES_MOVIMIENTO_EQUIPO,
     )
 
     # La politica de la Practica 3 solo acepta el client id de la placa.

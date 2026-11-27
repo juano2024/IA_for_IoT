@@ -28,6 +28,8 @@ firmware/esp32_dht11_aws/secrets.h
 # Actividad 4: secretos del firmware y fotos del dataset
 firmware/esp32_edge_ai/secrets.h
 firmware/esp32cam_vision/secrets.h
+firmware/firmware_cuartobebe_v4/secrets.h
+*.zip
 dataset/
 
 # Credenciales copiadas a mano (no deben subirse)
