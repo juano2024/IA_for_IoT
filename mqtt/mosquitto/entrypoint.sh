@@ -8,6 +8,9 @@ mkdir -p /mosquitto/data /mosquitto/log
 chown -R mosquitto:mosquitto /mosquitto/data /mosquitto/log
 
 if [ -n "${MQTT_USER:-}" ] && [ -n "${MQTT_PASSWORD:-}" ]; then
+  # Mosquitto 2 no recrea un archivo existente con -c: tras un reinicio el
+  # contenedor quedaba en bucle. Se borra para regenerarlo con la clave actual.
+  rm -f "$PASSWD"
   mosquitto_passwd -b -c "$PASSWD" "$MQTT_USER" "$MQTT_PASSWORD"
   chown mosquitto:mosquitto "$PASSWD"
   chmod 600 "$PASSWD"
