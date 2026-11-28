@@ -1,0 +1,18 @@
+# El puente lee de un broker publico en vez de Mosquitto local, para una placa
+# que esta en otra ciudad. Solo para la demo: ese broker no tiene clave y
+# cualquiera que conozca el prefijo puede leer los mensajes.
+#
+#   $env:BROKER_PREFIJO = "uao-cuartobebe-xxxxxxxx"
+#   docker compose -f mqtt/docker-compose.yml -f mqtt/docker-compose.remoto.yml up -d bridge
+#
+# Para volver al broker local:
+#   docker compose -f mqtt/docker-compose.yml up -d bridge
+services:
+  bridge:
+    environment:
+      MQTT_HOST: "${BROKER_REMOTO:-broker.hivemq.com}"
+      MQTT_PORT: "1883"
+      MQTT_USERNAME: ""
+      MQTT_PASSWORD: ""
+      MQTT_TOPIC_PREFIX: "${BROKER_PREFIJO:?Define BROKER_PREFIJO con el prefijo unico de la placa}"
+      MQTT_CLIENT_ID: "puente-${BROKER_PREFIJO}"

@@ -51,10 +51,14 @@
 #define LED_PIN           2
 #define DEVICE_ID         "esp32-cuna"
 
-#define TOPIC_CLIMA       "cuartobebe/clima"
-#define TOPIC_MOVIMIENTO  "cuartobebe/movimiento"
-#define TOPIC_ESTADO      "cuartobebe/estado"
-#define TOPIC_COMANDOS    "cuartobebe/comandos"
+// Con un broker publico, define TOPIC_PREFIX en secrets.h con un nombre unico.
+#ifndef TOPIC_PREFIX
+#define TOPIC_PREFIX      "cuartobebe"
+#endif
+#define TOPIC_CLIMA       TOPIC_PREFIX "/clima"
+#define TOPIC_MOVIMIENTO  TOPIC_PREFIX "/movimiento"
+#define TOPIC_ESTADO      TOPIC_PREFIX "/estado"
+#define TOPIC_COMANDOS    TOPIC_PREFIX "/comandos"
 
 // ---------------- MCP ----------------
 #define MCP_PUERTO        80
